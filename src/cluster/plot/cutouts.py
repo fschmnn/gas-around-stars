@@ -111,8 +111,8 @@ def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
     plt.subplots_adjust(wspace=-0.1, hspace=0)
 
     if filename:
-        plt.savefig(filename.with_suffix('.png'),dpi=600)
-        plt.savefig(filename.with_suffix('.pdf'),dpi=600)
+        plt.savefig(filename.with_suffix('.png'),dpi=300)
+        plt.savefig(filename.with_suffix('.pdf'),dpi=300)
     plt.show()
 
 from matplotlib.backends.backend_pdf import PdfPages
@@ -170,7 +170,7 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
                 ax = next(axes_iter)
                 ax.axis('off')
                 ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='center left',frameon=False)
-                t = ax.text(0.06,0.87,'region_ID/cluster_ID', transform=ax.transAxes,color='black',fontsize=8)
+                t = ax.text(0.06,0.87,'region ID/cluster ID', transform=ax.transAxes,color='black',fontsize=8)
 
                 for i in range(nrows*ncols-len(sub_positions)-1):
                     # remove the empty axes at the bottom

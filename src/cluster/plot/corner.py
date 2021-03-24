@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 from cluster.auxiliary import bin_stat
 
-def corner(table,columns,limits={},filename=None):
+def corner(table,columns,limits={},colors=None,nbins=10,filename=None,**kwargs):
     '''Create a pairwise plot for all names in columns
     
     Parameters
@@ -35,12 +35,13 @@ def corner(table,columns,limits={},filename=None):
                 else:
                     ax.set_xticklabels([])
 
-                ax.scatter(table[col],table[row])
-                
+                ax.scatter(table[col],table[row],**kwargs)
+
+
                 xlim = limits.get(col,None)
                 ylim = limits.get(row,None)
                 if xlim: 
-                    x,mean,std = bin_stat(table[col],table[row],xlim)
+                    x,mean,std = bin_stat(table[col],table[row],xlim,nbins=nbins)
                     ax.errorbar(x,mean,yerr=std,fmt='-',color='black')
                     ax.set_xlim(xlim)
 
