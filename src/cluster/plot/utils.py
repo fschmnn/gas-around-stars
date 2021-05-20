@@ -180,3 +180,4 @@ def rainbow_text(x, y, strings, colors, orientation='horizontal',
             t = text.get_transform() + Affine2D().translate(ex.width, 0)
         else:
             t = text.get_transform() + Affine2D().translate(0, ex.height)
+

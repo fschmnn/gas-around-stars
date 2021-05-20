@@ -58,17 +58,15 @@ def extinction(EBV,EBV_err,wavelength,plot=False):
     return ext,ext_err
 
 sample_table = ascii.read(basedir/'..'/'pnlf'/'data'/'interim'/'sample.txt')
-sample_table.add_index('Name')
+sample_table.add_index('name')
 
 # nebulae catalogue from Francesco (mostly HII-regions)
-with fits.open(data_ext / 'MUSE_DR2' / 'Nebulae catalogue' / 'Nebulae_Catalogue_DR2_native.fits') as hdul:
+with fits.open(data_ext / 'MUSE_DR2.1' / 'Nebulae catalogue' / 'Nebulae_catalogue_v2.fits') as hdul:
     nebulae = Table(hdul[1].data)
 nebulae['FUV_FLUX'] = np.nan
 nebulae['FUV_FLUX_ERR'] = np.nan
 nebulae['FUV_FLUX_CORR'] = np.nan
 nebulae['FUV_FLUX_CORR_ERR'] = np.nan
-
-nebulae['gal_name'][nebulae['gal_name']=='NGC628'] = 'NGC0628'
 
 astrosat_sample =set([x.stem.split('_')[0] for x in (data_ext/'Astrosat').iterdir() if x.is_file() and x.suffix=='.fits'])
 
@@ -77,7 +75,7 @@ for name in astrosat_sample:
     print(f'start with {name}')
     p = {x:sample_table.loc[name][x] for x in sample_table.columns}
 
-    filename = data_ext / 'MUSE_DR2' / 'MUSEDAP' / f'{name}_MAPS.fits'
+    filename = data_ext / 'MUSE_DR2.1' / 'MUSEDAP' / f'{name}_MAPS.fits'
     with fits.open(filename) as hdul:
         Halpha = NDData(data=hdul['HA6562_FLUX'].data,
                         uncertainty=StdDevUncertainty(hdul['HA6562_FLUX_ERR'].data),
@@ -86,12 +84,9 @@ for name in astrosat_sample:
                         wcs=WCS(hdul['HA6562_FLUX'].header))
 
 
-    filename = data_ext / 'MUSE_DR2' / 'Nebulae catalogue' /'spatial_masks'/f'{name}_HIIreg_mask.fits'
+    filename = data_ext / 'MUSE_DR2.1' / 'Nebulae catalogue' /'spatial_masks'/f'{name}_nebulae_mask.fits'
     with fits.open(filename) as hdul:
-        #HII_mask = NDData(hdul[0].data,mask=np.isnan(hdul[0].data),meta=hdul[0].header,wcs=WCS(hdul[0].header))
-        #HII_mask.data[HII_mask.data==-1] = np.nan
-
-        nebulae_mask = NDData(hdul[0].data-1,mask=Halpha.mask,meta=hdul[0].header,wcs=WCS(hdul[0].header))
+        nebulae_mask = NDData(hdul[0].data.astype(float),mask=Halpha.mask,meta=hdul[0].header,wcs=WCS(hdul[0].header))
         nebulae_mask.data[nebulae_mask.data==-1] = np.nan
 
     print(f'read in nebulae catalogue')
@@ -139,4 +134,4 @@ for name in astrosat_sample:
 primary_hdu = fits.PrimaryHDU()
 table_hdu   = fits.BinTableHDU(nebulae)
 hdul = fits.HDUList([primary_hdu, table_hdu])
-hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_with_FUV_DR2.fits',overwrite=True)
+hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_with_FUV_v2p1.fits',overwrite=True)

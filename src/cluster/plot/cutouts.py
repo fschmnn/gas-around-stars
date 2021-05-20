@@ -34,6 +34,11 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
     for coords in contours:
         ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=0.5,label='HII-region')
 
+
+    mask = np.zeros((*cutout_mask.shape,4))
+    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.05)
+    ax.imshow(mask,origin='lower')
+
     # plot the association catalogue
     if mask2:
         cutout_mask, _  = reproject_interp(mask2,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
@@ -47,6 +52,10 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
 
         for coords in contours:
             ax.plot(coords[:,1],coords[:,0],color='tab:blue',lw=0.5,label='association')
+
+        mask = np.zeros((*cutout_mask.shape,4))
+        mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.05)
+        ax.imshow(mask,origin='lower')
 
     # mark the position of the clusters within the cutout
     if points:
@@ -112,7 +121,7 @@ def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
 
     if filename:
         plt.savefig(filename.with_suffix('.png'),dpi=300)
-        plt.savefig(filename.with_suffix('.pdf'),dpi=300)
+        #plt.savefig(filename.with_suffix('.pdf'),dpi=300)
     plt.show()
 
 from matplotlib.backends.backend_pdf import PdfPages
@@ -139,11 +148,12 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
     width = 8.27
     N = len(positions)
     Npage = nrows*ncols
-
+    Npages = int(np.ceil(N/Npage))
     with PdfPages(filename.with_suffix('.pdf')) as pdf:
         
-        for i in range(int(np.ceil(N/Npage))):
-            print(f'working on page {i+1}')
+        for i in range(Npages):
+            print(f'working on page {i+1} of {Npages}')
+
             
             sub_positions = positions[i*Npage:(i+1)*Npage]
             sub_labels = labels[i*Npage:(i+1)*Npage]
@@ -169,8 +179,8 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
                 h,l = fig.axes[0].get_legend_handles_labels()
                 ax = next(axes_iter)
                 ax.axis('off')
-                ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='center left',frameon=False)
-                t = ax.text(0.06,0.87,'region ID/cluster ID', transform=ax.transAxes,color='black',fontsize=8)
+                ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='center',frameon=False)
+                t = ax.text(0.06,0.87,'region ID/assoc ID', transform=ax.transAxes,color='black',fontsize=8)
 
                 for i in range(nrows*ncols-len(sub_positions)-1):
                     # remove the empty axes at the bottom
