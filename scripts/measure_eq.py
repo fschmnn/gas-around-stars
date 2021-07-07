@@ -6,7 +6,7 @@ from tqdm import tqdm
 import numpy as np
 
 from astropy.io import ascii, fits
-from astropy.table import Table 
+from astropy.table import Table, vstack
 import astropy.units as u 
 import astropy.constants as c
 from astropy.coordinates import Distance
@@ -25,11 +25,11 @@ sample_table.add_index('name')
 
 
 # nebulae catalogue from Francesco (mostly HII-regions)
-with fits.open(basedir/'data'/'interim'/'Nebulae_Catalogue_with_FUV_v2p1.fits') as hdul:
+with fits.open(basedir/'data'/'interim'/'Nebulae_Catalogue_v2p1.fits') as hdul:
     nebulae = Table(hdul[1].data)
 nebulae['eq_width'] = np.nan
 
-
+lst = []
 for name in tqdm(np.unique(nebulae['gal_name']),position=0,leave=False,colour='green'):
     
     p = {x:sample_table.loc[name][x] for x in sample_table.columns}
@@ -47,7 +47,7 @@ for name in tqdm(np.unique(nebulae['gal_name']),position=0,leave=False,colour='g
     lam_HA0 = 6562.8*u.Angstrom
     lam_HA = (1+z)*lam_HA0
     
-    sub = nebulae[nebulae['gal_name']==name]
+    sub = nebulae[nebulae['gal_name']==name][['gal_name','region_ID','eq_width','HA6562_FLUX']]
 
     for row in tqdm(sub,position=1,leave=False,colour='red',desc=name):
         try:
@@ -61,9 +61,12 @@ for name in tqdm(np.unique(nebulae['gal_name']),position=0,leave=False,colour='g
             row['eq_width'] = eq_width.value
         except:
             print(f'error for {name} {region_ID}')
+    del sub['HA6562_FLUX']
+    lst.append(sub)
+tbl = vstack(lst)
 
 # write to file
 primary_hdu = fits.PrimaryHDU()
-table_hdu   = fits.BinTableHDU(nebulae)
+table_hdu   = fits.BinTableHDU(tbl)
 hdul = fits.HDUList([primary_hdu, table_hdu])
-hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_with_FUV_eq_v2p1.fits',overwrite=True)
+hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_v2p1_eq.fits',overwrite=True)

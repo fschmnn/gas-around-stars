@@ -1,6 +1,6 @@
 import numpy as np
 
-def diagnostic_line_ratios(table):
+def diagnostic_line_ratios(table,append=True):
     '''calculate diagnostic line ratios
     
     They are commonly used in metallicity prescriptions
@@ -22,4 +22,7 @@ def diagnostic_line_ratios(table):
         table['RS3'] = (3.44*table['SIII9068_FLUX_CORR'])/table['SIII6312_FLUX_CORR']
         table['RN2'] = 4/3*table['NII6583_FLUX_CORR']/table['NII5754_FLUX_CORR']
 
-    return table
+    if append==True:
+        return table
+    else:
+        return table[['N2','R2','R3','S2','R23','RS2','RO2','RS3','RN2']]

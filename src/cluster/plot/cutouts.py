@@ -18,7 +18,8 @@ two_column    = 6.974 # in inch
 def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
     
     cutout_image = Cutout2D(image.data,position,size=size,wcs=image.wcs)
-    norm = simple_norm(cutout_image.data,clip=False,percent=99)
+    norm = simple_norm(cutout_image.data,clip=False,stretch='linear',percent=99.5)
+
     ax.imshow(cutout_image.data,origin='lower',norm=norm,cmap=plt.cm.gray_r)
 
     # plot the nebulae catalogue
@@ -32,11 +33,11 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
         contours += find_contours(blank_mask, 0.5)
 
     for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=0.5,label='HII-region')
+        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label='HII-region')
 
 
     mask = np.zeros((*cutout_mask.shape,4))
-    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.05)
+    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
     ax.imshow(mask,origin='lower')
 
     # plot the association catalogue
@@ -51,10 +52,10 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
             contours += find_contours(blank_mask, 0.5)
 
         for coords in contours:
-            ax.plot(coords[:,1],coords[:,0],color='tab:blue',lw=0.5,label='association')
+            ax.plot(coords[:,1],coords[:,0],color='tab:blue',lw=1,label='association')
 
         mask = np.zeros((*cutout_mask.shape,4))
-        mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.05)
+        mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.1)
         ax.imshow(mask,origin='lower')
 
     # mark the position of the clusters within the cutout

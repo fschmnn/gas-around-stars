@@ -16,6 +16,7 @@ from reproject import reproject_interp
 from dust_extinction.parameter_averages import O94, CCM89
 
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 '''
 logging.basicConfig(stream=sys.stdout,
@@ -70,7 +71,7 @@ nebulae['FUV_FLUX_CORR_ERR'] = np.nan
 
 astrosat_sample =set([x.stem.split('_')[0] for x in (data_ext/'Astrosat').iterdir() if x.is_file() and x.suffix=='.fits'])
 
-for name in astrosat_sample:
+for name in tqdm(sorted(astrosat_sample)):
     
     print(f'start with {name}')
     p = {x:sample_table.loc[name][x] for x in sample_table.columns}
@@ -132,6 +133,6 @@ for name in astrosat_sample:
     
 # write to file
 primary_hdu = fits.PrimaryHDU()
-table_hdu   = fits.BinTableHDU(nebulae)
+table_hdu   = fits.BinTableHDU(nebulae[['gal_name','region_ID','FUV_FLUX','FUV_FLUX_ERR','FUV_FLUX_CORR','FUV_FLUX_CORR_ERR']])
 hdul = fits.HDUList([primary_hdu, table_hdu])
-hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_with_FUV_v2p1.fits',overwrite=True)
+hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_v2p1_FUV.fits',overwrite=True)
