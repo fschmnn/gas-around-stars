@@ -11,24 +11,27 @@ from astropy.wcs import WCS
 from astropy.stats import sigma_clipped_stats
 import astropy.units as u 
 
-from pnlf.regions import Regions
+from astropy.convolution import Gaussian2DKernel
+from astropy.convolution import convolve, convolve_fft
+
+import astrotools as tools
+from astrotools.regions import Regions
 from reproject import reproject_interp
 from dust_extinction.parameter_averages import O94, CCM89
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
-'''
-logging.basicConfig(stream=sys.stdout,
-                    #format='(levelname)s %(name)s %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-'''
+from datetime import date
 
 basedir = Path('..')
-data_ext = Path('a:')
+data_ext = Path('/data')
+
+# Milky Way E(B-V) from  Schlafly & Finkbeiner (2011)
+EBV_MW = {'IC5332': 0.015,'NGC0628': 0.062,'NGC1087': 0.03,'NGC1300': 0.026,
+          'NGC1365': 0.018,'NGC1385': 0.018,'NGC1433': 0.008,'NGC1512': 0.009,
+          'NGC1566': 0.008,'NGC1672': 0.021,'NGC2835': 0.089,'NGC3351': 0.024,
+          'NGC3627': 0.037,'NGC4254': 0.035,'NGC4303': 0.02,'NGC4321': 0.023,
+          'NGC4535': 0.017,'NGC5068': 0.091,'NGC7496': 0.008}
 
 extinction_model = O94(Rv=3.1)
 
@@ -58,81 +61,139 @@ def extinction(EBV,EBV_err,wavelength,plot=False):
  
     return ext,ext_err
 
-sample_table = ascii.read(basedir/'..'/'pnlf'/'data'/'interim'/'sample.txt')
-sample_table.add_index('name')
-
 # nebulae catalogue from Francesco (mostly HII-regions)
-with fits.open(data_ext / 'MUSE_DR2.1' / 'Nebulae catalogue' / 'Nebulae_catalogue_v2.fits') as hdul:
+with fits.open(data_ext / 'Products' / 'Nebulae_catalogs'/'Nebulae_catalogue_v2' / 'Nebulae_catalogue_v2.fits') as hdul:
     nebulae = Table(hdul[1].data)
 nebulae['FUV_FLUX'] = np.nan
 nebulae['FUV_FLUX_ERR'] = np.nan
 nebulae['FUV_FLUX_CORR'] = np.nan
 nebulae['FUV_FLUX_CORR_ERR'] = np.nan
 
-astrosat_sample =set([x.stem.split('_')[0] for x in (data_ext/'Astrosat').iterdir() if x.is_file() and x.suffix=='.fits'])
+nebulae['HA_conv_FLUX'] = np.nan
+nebulae['HA_conv_FLUX_ERR'] = np.nan
+nebulae['HA_conv_FLUX_CORR'] = np.nan
+nebulae['HA_conv_FLUX_CORR_ERR'] = np.nan
 
-for name in tqdm(sorted(astrosat_sample)):
+astrosat_sample =set([x.stem.split('_')[0] for x in (data_ext/'Ancillary'/'Astrosat').iterdir() if x.is_file() and x.suffix=='.fits'])
+
+for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     
-    print(f'start with {name}')
-    p = {x:sample_table.loc[name][x] for x in sample_table.columns}
+    if gal_name not in astrosat_sample:
+        continue
+        
+    print(f'start with {gal_name}')
 
-    filename = data_ext / 'MUSE_DR2.1' / 'MUSEDAP' / f'{name}_MAPS.fits'
+    print(f'read in nebulae catalogue')
+    filename = next((data_ext/'MUSE'/'DR2.1'/'copt'/'MUSEDAP').glob(f'{gal_name}*.fits'))
+    copt_res = float(filename.stem.split('-')[1].split('asec')[0])
     with fits.open(filename) as hdul:
         Halpha = NDData(data=hdul['HA6562_FLUX'].data,
                         uncertainty=StdDevUncertainty(hdul['HA6562_FLUX_ERR'].data),
                         mask=np.isnan(hdul['HA6562_FLUX'].data),
                         meta=hdul['HA6562_FLUX'].header,
                         wcs=WCS(hdul['HA6562_FLUX'].header))
-
-
-    filename = data_ext / 'MUSE_DR2.1' / 'Nebulae catalogue' /'spatial_masks'/f'{name}_nebulae_mask.fits'
+    
+    filename = data_ext / 'Products' / 'Nebulae_catalogs'/'Nebulae_catalogue_v2' /'spatial_masks'/f'{gal_name}_nebulae_mask_V2.fits'
     with fits.open(filename) as hdul:
         nebulae_mask = NDData(hdul[0].data.astype(float),mask=Halpha.mask,meta=hdul[0].header,wcs=WCS(hdul[0].header))
         nebulae_mask.data[nebulae_mask.data==-1] = np.nan
-
-    print(f'read in nebulae catalogue')
     
-    # whitelight image
-    astro_file = data_ext / 'Astrosat' / f'{name}_FUV_F148W_flux_reproj.fits'
-
+    print(f'read in astrosat data')
+    astro_file = data_ext /'Ancillary'/'Astrosat' / f'{gal_name}_FUV_F148W_flux_reproj.fits'
     if not astro_file.is_file():
-        astro_file = data_ext / 'Astrosat' / f'{name}_FUV_F154W_flux_reproj.fits'
+        astro_file = data_ext / 'Ancillary'/'Astrosat' / f'{gal_name}_FUV_F154W_flux_reproj.fits'
         if not astro_file.is_file():
-            print(f'no astrosat file for {name}')
+            print(f'no astrosat file for {gal_name}')
 
     with fits.open(astro_file) as hdul:
         d = hdul[0].data
         astrosat = NDData(hdul[0].data,meta=hdul[0].header,wcs=WCS(hdul[0].header))
-    print(f'read in astrosat data')
-    
+        for row in hdul[0].header['COMMENT']:
+            if row.startswith('CTSTOFLUX'):
+                _,CTSTOFLUX = row.split(':')
+                CTSTOFLUX = float(CTSTOFLUX)
+            if row.startswith('IntTime'):
+                _,IntTime = row.split(':')
+                IntTime = float(IntTime)
+        
+        
+    print('reproject regions')
     muse_regions = Regions(mask=nebulae_mask.data,projection=nebulae_mask.meta,bkg=-1)
     astrosat_regions = muse_regions.reproject(astrosat.meta)
-    print('regions reprojected')
     
-    muse_reproj, footprint = reproject_interp((nebulae_mask.mask,nebulae_mask.wcs),astrosat.meta)
-    mean,median,std=sigma_clipped_stats(astrosat.data[footprint.astype(bool)])
-    print('measuring sigma_clipped_stats')
-    
-    tmp = nebulae[nebulae['gal_name']==name]
+    tmp = nebulae[nebulae['gal_name']==gal_name]
 
+    print('measuring FUV flux')
     flux = np.array([np.sum(astrosat.data[astrosat_regions.mask==ID]) for ID in tmp['region_ID']])
-    err = np.array([np.sqrt(median**2 * len(astrosat_regions.coords[astrosat_regions.labels.index(ID)][0])) for ID in tmp['region_ID']])
-    print('measuring flux')
+    err  = np.sqrt(flux*CTSTOFLUX/IntTime)
     
+    print('FUV extinction correction')
     # E(B-V) is estimated from nebulae. E(B-V)_star = 0.5 E(B-V)_nebulae. FUV comes directly from stars
-    extinction_mw  = extinction_model.extinguish(1481*u.angstrom,Ebv=0.5*p['E(B-V)'])
+    extinction_mw  = extinction_model.extinguish(1481*u.angstrom,Ebv=0.5*EBV_MW[gal_name])
     ext_int,ext_int_err = extinction(0.5*tmp['EBV'],tmp['EBV_ERR'],wavelength=1481*u.angstrom)
 
-    nebulae['FUV_FLUX'][nebulae['gal_name']==name] = 1e20*flux / extinction_mw
-    nebulae['FUV_FLUX_ERR'][nebulae['gal_name']==name] = 1e20*err / extinction_mw
+    nebulae['FUV_FLUX'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw
+    nebulae['FUV_FLUX_ERR'][nebulae['gal_name']==gal_name] = 1e20*err / extinction_mw
 
-    nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==name] = 1e20*flux / extinction_mw / ext_int 
-    nebulae['FUV_FLUX_CORR_ERR'][nebulae['gal_name']==name] =  nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==name] *np.sqrt((err/flux)**2 + (ext_int_err/ext_int)**2)  
+    nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw / ext_int 
+    nebulae['FUV_FLUX_CORR_ERR'][nebulae['gal_name']==gal_name] =  nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==gal_name] *np.sqrt((err/flux)**2 + (ext_int_err/ext_int)**2)  
 
-    print('extinction correction and write to catalogue\n')
     
+    print('convolve Halpha')
+    # we measure Halpha from a convolved image  
+    
+    # convolve uncertainty
+    # https://iopscience.iop.org/article/10.3847/2515-5172/abe8df
+    # var_conv = var x kernel^2
+
+    # times 5 to convert from arcesc to pixel
+    stddev = 5*np.sqrt(1.8**2-copt_res**2)
+
+    kernel = Gaussian2DKernel(x_stddev=stddev)
+    Halpha_conv = convolve_fft(Halpha,kernel,preserve_nan=True)
+    Halpha_err_conv = np.sqrt(convolve_fft(Halpha.uncertainty.array**2,kernel._array**2,normalize_kernel=False,preserve_nan=True))
+
+    print('measuring Halpha flux')
+    flux = np.array([np.sum(Halpha_conv[muse_regions.mask==ID]) for ID in tmp['region_ID']])
+    err  = np.array([np.sqrt(np.sum(Halpha_err_conv[muse_regions.mask==ID]**2)) for ID in tmp['region_ID']]) 
+    
+    print('Halpha extinction correction')
+    extinction_mw  = extinction_model.extinguish(6562*u.angstrom,Ebv=EBV_MW[gal_name])
+    ext_int,ext_int_err = extinction(tmp['EBV'],tmp['EBV_ERR'],wavelength=6562*u.angstrom)
+
+    nebulae['HA_conv_FLUX'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw
+    nebulae['HA_conv_FLUX_ERR'][nebulae['gal_name']==gal_name] = 1e20*err / extinction_mw
+
+    nebulae['HA_conv_FLUX_CORR'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw / ext_int 
+    nebulae['HA_conv_FLUX_CORR_ERR'][nebulae['gal_name']==gal_name] =  nebulae['HA_conv_FLUX'][nebulae['gal_name']==gal_name] *np.sqrt((err/flux)**2 + (ext_int_err/ext_int)**2)  
+
 # write to file
+columns = ['gal_name','region_ID',
+           'FUV_FLUX','FUV_FLUX_ERR','FUV_FLUX_CORR','FUV_FLUX_CORR_ERR',
+           'HA_conv_FLUX','HA_conv_FLUX_ERR','HA_conv_FLUX_CORR','HA_conv_FLUX_CORR_ERR']
+    
+doc = f'''this catalogue contains the FUV fluxes for the objects in the nebula 
+catalogue, measured from the Astrosat data (using the F148W filter for
+all galaxies except for NGC1433 and NGC1512, for which the F154W filter
+was used). All fluxes are in [f]=1e-20 erg s-1 cm-2 AA-1 and corrected 
+for Milky Way foreground extinction (with the extinction curve from 
+O'Donnell (1994) and E(B-V) from Schlafly & Finkbeiner (2011)). The 
+columns ending with _CORR are also corrected for internal extinction, 
+based on the E(B-V) from the nebula catalogue. The Halpha fluxes in the 
+catalogue are measured from the DAP linemap convolved to the same 
+resolution as the Astrosat data (1.8"). 
+Based on the nebula catalogue v2p0. 
+This catalogue was created with the following script:
+https://github.com/fschmnn/cluster/blob/master/scripts/measure_FUV.py
+last update: {date.today().strftime("%b %d, %Y")}
+'''
+
 primary_hdu = fits.PrimaryHDU()
-table_hdu   = fits.BinTableHDU(nebulae[['gal_name','region_ID','FUV_FLUX','FUV_FLUX_ERR','FUV_FLUX_CORR','FUV_FLUX_CORR_ERR']])
+for i,comment in enumerate(doc.split('\n')):
+    if i==0:
+        primary_hdu.header['COMMENT'] = comment
+    else:
+        primary_hdu.header[''] = comment
+table_hdu   = fits.BinTableHDU(nebulae[columns])
 hdul = fits.HDUList([primary_hdu, table_hdu])
-hdul.writeto(basedir/'data'/'interim'/'Nebulae_Catalogue_v2p1_FUV.fits',overwrite=True)
+hdul.writeto('Nebulae_Catalogue_v2p1_FUV.fits',overwrite=True)
