@@ -1,4 +1,5 @@
 # cluster
 
-*last updated 2020.08.25*
+*last updated 2022.01.25*
 
+this repository contains the code for Scheuermann et al. (in preparation).

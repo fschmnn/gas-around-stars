@@ -5,7 +5,7 @@ import astropy.units as u
 from dust_extinction.parameter_averages import O94, CCM89
 
 
-from cluster.plot.utils import single_column, two_column
+from astrotools.constants import single_column, two_column
 
 extinction_model = CCM89(Rv=3.1)
 
@@ -43,11 +43,13 @@ def extinction(EBV,EBV_err,wavelength,plot=False):
 
 
 
-def balmer_decrement(Halpha,Hbeta):
+def balmer_decrement(Halpha,Hbeta,extinction_model=O94(Rv=3.1)):
     '''calculate E(B-V) based on the Balmer decrement
     
-    assuming a ratio of Halpha/Hbeta/2.8
+    assuming a ratio of Halpha/Hbeta=2.86
     
+    !!! better use pyneb instead !!!
+
     Parameters
     ----------
     
@@ -57,14 +59,13 @@ def balmer_decrement(Halpha,Hbeta):
     '''
     
     Rv = 3.1
-    extinction_model = O94(Rv=3.1)
-    lam1 = 6562*u.angstrom
-    lam2 = 4861*u.angstrom
+    lam1 = 6562.81*u.angstrom
+    lam2 = 4861.33*u.angstrom
     k1 = extinction_model.evaluate(lam1,Rv)
     k2 = extinction_model.evaluate(lam2,Rv)
 
     # no idea why we need this factor of 0.32
-    EBV = 0.32 * 2.5 / (k2-k1) * np.log10(Halpha/Hbeta/2.8)
+    EBV = 0.32* 2.5 / (k2-k1) * np.log10(Halpha/Hbeta/2.86)
     EBV[EBV<0] = 0
     
     
