@@ -24,7 +24,11 @@ from tqdm import tqdm
 from datetime import date
 
 basedir = Path('..')
-data_ext = Path('/data')
+data_ext = Path('a:')/'Archive'
+
+astrosat_dir = data_ext / 'Astrosat'
+nebulae_dir  = data_ext / 'Products' / 'Nebulae_catalogs' / 'Nebulae_catalogue_v2'
+muse_dir     = data_ext / 'MUSE' / 'DR2.1' / 'copt' / 'MUSEDAP'
 
 # Milky Way E(B-V) from  Schlafly & Finkbeiner (2011)
 EBV_MW = {'IC5332': 0.015,'NGC0628': 0.062,'NGC1087': 0.03,'NGC1300': 0.026,
@@ -62,7 +66,7 @@ def extinction(EBV,EBV_err,wavelength,plot=False):
     return ext,ext_err
 
 # nebulae catalogue from Francesco (mostly HII-regions)
-with fits.open(data_ext / 'Products' / 'Nebulae_catalogs'/'Nebulae_catalogue_v2' / 'Nebulae_catalogue_v2.fits') as hdul:
+with fits.open(nebulae_dir / 'Nebulae_catalogue_v2.fits') as hdul:
     nebulae = Table(hdul[1].data)
 nebulae['FUV_FLUX'] = np.nan
 nebulae['FUV_FLUX_ERR'] = np.nan
@@ -74,7 +78,7 @@ nebulae['HA_conv_FLUX_ERR'] = np.nan
 nebulae['HA_conv_FLUX_CORR'] = np.nan
 nebulae['HA_conv_FLUX_CORR_ERR'] = np.nan
 
-astrosat_sample =set([x.stem.split('_')[0] for x in (data_ext/'Ancillary'/'Astrosat').iterdir() if x.is_file() and x.suffix=='.fits'])
+astrosat_sample =set([x.stem.split('_')[0] for x in astrosat_dir.iterdir() if x.is_file() and x.suffix=='.fits'])
 
 for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     
@@ -84,7 +88,7 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     print(f'start with {gal_name}')
 
     print(f'read in nebulae catalogue')
-    filename = next((data_ext/'MUSE'/'DR2.1'/'copt'/'MUSEDAP').glob(f'{gal_name}*.fits'))
+    filename = next(muse_dir.glob(f'{gal_name}*.fits'))
     copt_res = float(filename.stem.split('-')[1].split('asec')[0])
     with fits.open(filename) as hdul:
         Halpha = NDData(data=hdul['HA6562_FLUX'].data,
@@ -93,15 +97,15 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
                         meta=hdul['HA6562_FLUX'].header,
                         wcs=WCS(hdul['HA6562_FLUX'].header))
     
-    filename = data_ext / 'Products' / 'Nebulae_catalogs'/'Nebulae_catalogue_v2' /'spatial_masks'/f'{gal_name}_nebulae_mask_V2.fits'
+    filename = nebulae_dir /'spatial_masks'/f'{gal_name}_nebulae_mask.fits'
     with fits.open(filename) as hdul:
         nebulae_mask = NDData(hdul[0].data.astype(float),mask=Halpha.mask,meta=hdul[0].header,wcs=WCS(hdul[0].header))
         nebulae_mask.data[nebulae_mask.data==-1] = np.nan
     
     print(f'read in astrosat data')
-    astro_file = data_ext /'Ancillary'/'Astrosat' / f'{gal_name}_FUV_F148W_flux_reproj.fits'
+    astro_file = astrosat_dir / f'{gal_name}_FUV_F148W_flux_reproj.fits'
     if not astro_file.is_file():
-        astro_file = data_ext / 'Ancillary'/'Astrosat' / f'{gal_name}_FUV_F154W_flux_reproj.fits'
+        astro_file = astrosat_dir / f'{gal_name}_FUV_F154W_flux_reproj.fits'
         if not astro_file.is_file():
             print(f'no astrosat file for {gal_name}')
 
