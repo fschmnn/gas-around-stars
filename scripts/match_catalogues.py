@@ -51,12 +51,13 @@ logger = logging.getLogger(__name__)
 logging.getLogger('astropy').setLevel(logging.WARNING)
 
 basedir  = Path('.')
-data_ext = Path('/data') 
+#data_ext = Path('/data') 
+data_ext = Path('a:')/'Archive'
 
 # --------- define the location of the files --------------------------
 association_folder = data_ext/'Products'/'stellar_associations'
 nebulae_file = data_ext/'Products'/'Nebulae_catalogs'/'Nebulae_catalogue_v2'/ 'Nebulae_catalogue_v2.fits'
-env_masks_folder = Path('/data') / 'Products' / 'environment_masks' / 'v5' / 'masks_v5p3_simple'
+env_masks_folder = data_ext / 'Products' / 'environment_masks' / 'v5' / 'masks_v5p3_simple'
 # ---------------------------------------------------------------------
 
 environment_dict = {      1 : 'center', 2 : 'bar', 3 : 'bar ends', 4 : 'interbar', 
@@ -182,7 +183,7 @@ def main(name,version,HSTband,scalepc):
     nebulae = nebulae[nebulae['gal_name']==name]
     nebulae.add_index('region_ID')
 
-    filename = data_ext / 'Products' / 'Nebulae_catalogs'/'Nebulae_catalogue_v2' /'spatial_masks'/f'{name}_nebulae_mask_V2.fits'
+    filename = data_ext / 'Products' / 'Nebulae_catalogs'/'Nebulae_catalogue_v2' /'spatial_masks'/f'{name}_nebulae_mask.fits'
     with fits.open(filename) as hdul:
         nebulae_mask = NDData(hdul[0].data.astype(float),mask=Halpha.mask,meta=hdul[0].header,wcs=WCS(hdul[0].header))
         nebulae_mask.data[nebulae_mask.data==-1] = np.nan

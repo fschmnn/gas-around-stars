@@ -9,7 +9,7 @@ def extract_spectra(cube,header,mask,regions,filename):
     for i,region_ID in enumerate(regions):
         print(f'{i+1} of {len(regions)}')
 
-        spectrum.append(np.sum(data_cube[...,mask==region_ID],axis=1))  
+        spectrum.append(np.sum(cube[...,mask==region_ID],axis=1))  
         wavelength.append(np.linspace(header['CRVAL3'],header['CRVAL3']+header['NAXIS3']*header['CD3_3'],header['NAXIS3']))
     
     spectra = Table(data=[regions,wavelength,spectrum],

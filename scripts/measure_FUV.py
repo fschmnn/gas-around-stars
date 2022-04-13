@@ -79,6 +79,7 @@ nebulae['HA_conv_FLUX_CORR'] = np.nan
 nebulae['HA_conv_FLUX_CORR_ERR'] = np.nan
 
 astrosat_sample =set([x.stem.split('_')[0] for x in astrosat_dir.iterdir() if x.is_file() and x.suffix=='.fits'])
+print(f'measuring FUV for {len(astrosat_sample)} galaxies')
 
 for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     
@@ -133,8 +134,9 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     
     print('FUV extinction correction')
     # E(B-V) is estimated from nebulae. E(B-V)_star = 0.5 E(B-V)_nebulae. FUV comes directly from stars
-    extinction_mw  = extinction_model.extinguish(1481*u.angstrom,Ebv=0.5*EBV_MW[gal_name])
-    ext_int,ext_int_err = extinction(0.5*tmp['EBV'],tmp['EBV_ERR'],wavelength=1481*u.angstrom)
+    # https://ned.ipac.caltech.edu/level5/Sept12/Calzetti/Calzetti1_4.html or Calzetti+2000
+    extinction_mw  = extinction_model.extinguish(1481*u.angstrom,Ebv=0.44*EBV_MW[gal_name])
+    ext_int,ext_int_err = extinction(0.44*tmp['EBV'],tmp['EBV_ERR'],wavelength=1481*u.angstrom)
 
     nebulae['FUV_FLUX'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw
     nebulae['FUV_FLUX_ERR'][nebulae['gal_name']==gal_name] = 1e20*err / extinction_mw

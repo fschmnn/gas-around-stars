@@ -12,7 +12,7 @@ version = 'v1p2'
 band_wavelength = {'NUV':270.4*u.AA,'U':335.5*u.AA,'B':432.5*u.AA,'V':530.8*u.AA,'I':802.4*u.AA}
 freq_to_wave = lambda band: u.mJy.to(u.erg/u.s/u.cm**2/u.Angstrom,equivalencies=spectral_density(band_wavelength[band]))
 
-base_folder=data_ext/'HST'/'stellar_associations'/f'associations_{version}'
+base_folder=data_ext/'Products'/'stellar_associations'/f'associations_{version}'
 
 for scalepc in [8,16,32,64]:
     for HSTband in ['nuv','v']:

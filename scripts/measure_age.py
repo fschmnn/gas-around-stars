@@ -1,3 +1,10 @@
+'''measure nebulae ages from stellar population fits
+
+this script reads the nebulae catalogue and the MUSEDAP and measures
+the age at the position of the nebulae (radius=2) from the stellar 
+population fit (mass and light weighted).
+'''
+
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +20,7 @@ from photutils import CircularAperture,aperture_photometry
 basedir = Path('..')
 data_ext = Path('a:')/'Archive'
 
+print('read in catalogue')
 # the original catalogue from Francesco
 with fits.open(basedir / 'data' / 'interim' / 'Nebulae_Catalogue_v2p1.fits') as hdul:
     nebulae = Table(hdul[1].data)
