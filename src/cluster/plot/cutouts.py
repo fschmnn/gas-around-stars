@@ -16,7 +16,8 @@ single_column = 3.321 # in inch
 two_column    = 6.974 # in inch
 
 def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
-    
+    position = position.directional_offset_by(0*u.deg,0.3*u.arcsec)
+
     cutout_image = Cutout2D(image.data,position,size=size,wcs=image.wcs)
     norm = simple_norm(cutout_image.data,clip=False,stretch='linear',percent=99.5)
 
@@ -38,7 +39,7 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
 
     mask = np.zeros((*cutout_mask.shape,4))
     mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
-    ax.imshow(mask,origin='lower')
+    ax.imshow(mask,origin='lower',cmap=plt.cm.gist_heat)
 
     # plot the association catalogue
     if mask2:
@@ -68,7 +69,7 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
                 ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='cluster')
 
     if label:
-        t = ax.text(0.07,0.875,label, transform=ax.transAxes,color='black',fontsize=8)
+        t = ax.text(0.07,0.86,label, transform=ax.transAxes,color='black',fontsize=7)
         t.set_bbox(dict(facecolor='white', alpha=1, ec='white'))
 
     ax.set_xticks([])
@@ -83,7 +84,7 @@ def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=
     cutout_g, _  = reproject_interp(g,output_projection=cutout_b.wcs,shape_out=cutout_b.shape)    
 
     rgb = create_RGB(cutout_r,cutout_g,cutout_b.data,
-                        percentile=[98,98,99.8],weights=[0.7,0.6,1])
+                        percentile=[98,98,98],weights=[0.81,.81,.81])
 
     ax.imshow(rgb,origin='lower')
 
@@ -143,7 +144,7 @@ def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=
 
 
 def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
-                 filename=None,size=6*u.arcsec,ncols=4):
+                 width = two_column,filename=None,size=6*u.arcsec,ncols=4):
     '''Plot multiple cutouts with the position of the clusters
     
     Parameters
@@ -163,7 +164,6 @@ def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
     ncols = ncols
     nrows = int(np.ceil(len(positions)/ncols))
 
-    width = two_column
     fig, axes = plt.subplots(nrows=nrows,ncols=ncols,figsize=(width,width/ncols*nrows))
     axes_iter = iter(axes.flatten())
 
