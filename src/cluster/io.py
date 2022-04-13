@@ -1,5 +1,9 @@
-import numpy as np
 from pathlib import Path 
+
+import re
+import logging 
+import numpy as np
+
 from astropy.io import fits
 from astropy.nddata import NDData
 from astropy.wcs import WCS 
@@ -7,9 +11,72 @@ from astropy.table import Table
 from astropy.coordinates import SkyCoord
 import astropy.units as u 
 from astropy.units import spectral_density
+from astropy.visualization import simple_norm
 
+import matplotlib.pyplot as plt 
+
+
+logger = logging.getLogger(__name__)
 HSTbands_wave = {'NUV':2704*u.AA,'U':3355*u.AA,'B':4325*u.AA,'V':5308*u.AA,'I':8024*u.AA}
 freq_to_wave = lambda band: u.mJy.to(u.erg/u.s/u.cm**2/u.Angstrom,equivalencies=spectral_density(HSTbands_wave[band]))
+
+
+class ReadHST:
+    '''A class to read HST images in multiple filters'''
+        
+    def __init__(self,name,directory,HSTbands=['f275w','f336w','f435w','f438w','f555w','f814w']):
+        '''
+        Parameters 
+        ----------
+        
+        name : string
+        
+        directory : Path object
+        
+        HSTbands : list
+        '''
+        
+        logger.info(f'reading {name}')
+        self.name = name
+
+        for HSTband in HSTbands:
+            pattern = re.compile(f'(?=.*{name.lower()})(?=.*{HSTband})(?=.*exp-drc-sci)')
+            filename = [file for file in directory.iterdir() if pattern.search(file.stem)]
+            if len(filename)==0:
+                logger.warning(f'no file for {HSTband}')
+            else:
+                with fits.open(filename[0]) as hdul:
+                    data = NDData(hdul[0].data,
+                                  mask=hdul[0].data==0,
+                                  meta=hdul[0].header,
+                                  wcs=WCS(hdul[0].header))
+                setattr(self,HSTband,data)
+        
+    def __repr__(self):
+        '''create an overview of the available attributes'''
+   
+        string = ''
+        for k,v in self.__dict__.items():
+            if type(v) in [str,int,float]:
+                string += f'{k}: {v}\n'
+            else:
+                string += k + '\n'
+        return string
+    
+    def plot(self,HSTband,figsize=(6,6),cmap=plt.cm.hot,**kwargs):
+        
+        if not hasattr(self,HSTband):
+            raise AttributeError(f'object has no attribute {HSTband}')
+                
+        data = getattr(self,HSTband)
+        
+        fig = plt.figure(figsize=figsize)
+        ax  = fig.add_subplot(projection=data.wcs)
+        norm = simple_norm(data.data,clip=False,percent=99)
+        ax.imshow(data.data,norm=norm,cmap=cmap)
+        ax.set(**kwargs)
+        
+        plt.show()
 
 def read_associations(folder,target,scalepc,HSTband='nuv',version='v1p2',data='all'):
     '''read the catalogue and spatial mask for the associations
