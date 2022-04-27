@@ -17,7 +17,8 @@ from astropy.convolution import convolve, convolve_fft
 import astrotools as tools
 from astrotools.regions import Regions
 from reproject import reproject_interp
-from dust_extinction.parameter_averages import O94, CCM89
+#from dust_extinction.parameter_averages import O94, CCM89
+import pyneb as pn
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -37,24 +38,35 @@ EBV_MW = {'IC5332': 0.015,'NGC0628': 0.062,'NGC1087': 0.03,'NGC1300': 0.026,
           'NGC3627': 0.037,'NGC4254': 0.035,'NGC4303': 0.02,'NGC4321': 0.023,
           'NGC4535': 0.017,'NGC5068': 0.091,'NGC7496': 0.008}
 
-extinction_model = O94(Rv=3.1)
 
 def extinction(EBV,EBV_err,wavelength,plot=False):
-    '''Calculate the extinction for a given EBV and wavelength with errors'''
+    '''Calculate the extinction for a given EBV and wavelength with errors
+    
+    Parameters
+    ----------
+
+    EBV : array
+
+    EBV_err : array
+
+    wavelength : float
+    
+    '''
     
     EBV = np.atleast_1d(EBV)
+    EBV_err = np.atleast_1d(EBV_err)
     sample_size = 100000
-
-    ext = extinction_model.extinguish(wavelength,Ebv=EBV)
+    
+    ext = pn.RedCorr(R_V=3.1,E_BV=EBV,law='CCM89 oD94').getCorr(wavelength)
     
     EBV_rand = np.random.normal(loc=EBV,scale=EBV_err,size=(sample_size,len(EBV)))
-    ext_arr  = extinction_model.extinguish(wavelength,Ebv=EBV_rand)
-        
+    ext_arr  = pn.RedCorr(R_V=3.1,E_BV=EBV_rand,law='CCM89 oD94').getCorr(wavelength)
+    
     ext_err  = np.std(ext_arr,axis=0)
     ext_mean = np.mean(ext_arr,axis=0)
     
     if plot:
-        fig,(ax1,ax2) =plt.subplots(nrows=1,ncols=2,figsize=(two_column,two_column/2))
+        fig,(ax1,ax2) =plt.subplots(nrows=1,ncols=2,figsize=(6,6/2))
         ax1.hist(EBV_rand[:,0],bins=100)
         ax1.axvline(EBV[0],color='black')
         ax1.set(xlabel='E(B-V)')
@@ -73,10 +85,12 @@ nebulae['FUV_FLUX_ERR'] = np.nan
 nebulae['FUV_FLUX_CORR'] = np.nan
 nebulae['FUV_FLUX_CORR_ERR'] = np.nan
 
+'''
 nebulae['HA_conv_FLUX'] = np.nan
 nebulae['HA_conv_FLUX_ERR'] = np.nan
 nebulae['HA_conv_FLUX_CORR'] = np.nan
 nebulae['HA_conv_FLUX_CORR_ERR'] = np.nan
+'''
 
 astrosat_sample =set([x.stem.split('_')[0] for x in astrosat_dir.iterdir() if x.is_file() and x.suffix=='.fits'])
 print(f'measuring FUV for {len(astrosat_sample)} galaxies')
@@ -84,6 +98,7 @@ print(f'measuring FUV for {len(astrosat_sample)} galaxies')
 for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     
     if gal_name not in astrosat_sample:
+        print(f'no FUV data for {gal_name}')
         continue
         
     print(f'start with {gal_name}')
@@ -135,16 +150,18 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     print('FUV extinction correction')
     # E(B-V) is estimated from nebulae. E(B-V)_star = 0.5 E(B-V)_nebulae. FUV comes directly from stars
     # https://ned.ipac.caltech.edu/level5/Sept12/Calzetti/Calzetti1_4.html or Calzetti+2000
-    extinction_mw  = extinction_model.extinguish(1481*u.angstrom,Ebv=0.44*EBV_MW[gal_name])
-    ext_int,ext_int_err = extinction(0.44*tmp['EBV'],tmp['EBV_ERR'],wavelength=1481*u.angstrom)
+    rc_MW = pn.RedCorr(R_V=3.1,E_BV=0.44*EBV_MW[gal_name],law='CCM89 oD94')
 
-    nebulae['FUV_FLUX'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw
-    nebulae['FUV_FLUX_ERR'][nebulae['gal_name']==gal_name] = 1e20*err / extinction_mw
+    extinction_mw  = rc_MW.getCorr(1481)
+    ext_int,ext_int_err = extinction(0.44*tmp['EBV'],tmp['EBV_ERR'],wavelength=1481)
 
-    nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw / ext_int 
+    nebulae['FUV_FLUX'][nebulae['gal_name']==gal_name] = 1e20*flux * extinction_mw
+    nebulae['FUV_FLUX_ERR'][nebulae['gal_name']==gal_name] = 1e20*err * extinction_mw
+
+    nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==gal_name] = 1e20*flux * extinction_mw * ext_int 
     nebulae['FUV_FLUX_CORR_ERR'][nebulae['gal_name']==gal_name] =  nebulae['FUV_FLUX_CORR'][nebulae['gal_name']==gal_name] *np.sqrt((err/flux)**2 + (ext_int_err/ext_int)**2)  
 
-    
+    '''
     print('convolve Halpha')
     # we measure Halpha from a convolved image  
     
@@ -172,11 +189,13 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
 
     nebulae['HA_conv_FLUX_CORR'][nebulae['gal_name']==gal_name] = 1e20*flux / extinction_mw / ext_int 
     nebulae['HA_conv_FLUX_CORR_ERR'][nebulae['gal_name']==gal_name] =  nebulae['HA_conv_FLUX'][nebulae['gal_name']==gal_name] *np.sqrt((err/flux)**2 + (ext_int_err/ext_int)**2)  
+    '''
 
 # write to file
 columns = ['gal_name','region_ID',
            'FUV_FLUX','FUV_FLUX_ERR','FUV_FLUX_CORR','FUV_FLUX_CORR_ERR',
-           'HA_conv_FLUX','HA_conv_FLUX_ERR','HA_conv_FLUX_CORR','HA_conv_FLUX_CORR_ERR']
+           #'HA_conv_FLUX','HA_conv_FLUX_ERR','HA_conv_FLUX_CORR','HA_conv_FLUX_CORR_ERR'
+          ]
     
 doc = f'''this catalogue contains the FUV fluxes for the objects in the nebula 
 catalogue, measured from the Astrosat data (using the F148W filter for
@@ -185,9 +204,7 @@ was used). All fluxes are in [f]=1e-20 erg s-1 cm-2 AA-1 and corrected
 for Milky Way foreground extinction (with the extinction curve from 
 O'Donnell (1994) and E(B-V) from Schlafly & Finkbeiner (2011)). The 
 columns ending with _CORR are also corrected for internal extinction, 
-based on the E(B-V) from the nebula catalogue. The Halpha fluxes in the 
-catalogue are measured from the DAP linemap convolved to the same 
-resolution as the Astrosat data (1.8"). 
+based on the E(B-V) from the nebula catalogue. 
 Based on the nebula catalogue v2p0. 
 This catalogue was created with the following script:
 https://github.com/fschmnn/cluster/blob/master/scripts/measure_FUV.py
