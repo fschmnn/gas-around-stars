@@ -20,7 +20,6 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
 
     cutout_image = Cutout2D(image.data,position,size=size,wcs=image.wcs)
     norm = simple_norm(cutout_image.data,clip=False,stretch='linear',percent=99.5)
-
     ax.imshow(cutout_image.data,origin='lower',norm=norm,cmap=plt.cm.gray_r)
 
     # plot the nebulae catalogue
@@ -34,7 +33,7 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
         contours += find_contours(blank_mask, 0.5)
 
     for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label='HII-region')
+        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textsc{ii} region')
 
 
     mask = np.zeros((*cutout_mask.shape,4))
@@ -61,15 +60,18 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
 
     # mark the position of the clusters within the cutout
     if points:
+        
         region = RectangleSkyRegion(position,0.9*size,0.9*size)
         in_frame = points[region.contains(points['SkyCoord'],cutout_image.wcs)]
         for row in in_frame:
             x,y = row['SkyCoord'].to_pixel(cutout_image.wcs)
             if 5<x<cutout_image.data.shape[0]-5 and 5<y<cutout_image.data.shape[1]-5:
-                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='cluster')
-
+                ax.scatter(x,y,marker='o',facecolors='none',s=40,lw=0.8,color='green',label='DOLPHOT peaks')
+                if 'label' in points.columns:
+                    ax.annotate(row['label'], (x+4, y),color='green')
+ 
     if label:
-        t = ax.text(0.07,0.86,label, transform=ax.transAxes,color='black',fontsize=7)
+        t = ax.text(0.0663,0.8666,label, transform=ax.transAxes,color='black',fontsize=7)
         t.set_bbox(dict(facecolor='white', alpha=1, ec='white'))
 
     ax.set_xticks([])
@@ -99,7 +101,7 @@ def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=
         contours += find_contours(blank_mask, 0.5)
 
     for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label='HII-region')
+        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textit{ii}-region')
 
 
     mask = np.zeros((*cutout_mask.shape,4))
@@ -131,10 +133,10 @@ def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=
         for row in in_frame:
             x,y = row['SkyCoord'].to_pixel(cutout_b.wcs)
             if 5<x<cutout_b.data.shape[0]-5 and 5<y<cutout_b.data.shape[1]-5:
-                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='cluster')
+                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='compact cluster')
 
     if label:
-        t = ax.text(0.07,0.875,label, transform=ax.transAxes,color='black',fontsize=8)
+        t = ax.text(0.07,0.875,label, transform=ax.transAxes,color='black',fontsize=7)
         t.set_bbox(dict(facecolor='white', alpha=1, ec='white'))
 
     ax.set_xticks([])
@@ -142,6 +144,98 @@ def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=
     
     return ax
 
+import astrotools.plot.multicolorfits as mcf
+
+def create_multicolorimage(*args):
+    '''combine multiple images to a three color image'''
+    
+    color_images = []
+    for arg in args:
+        color = arg.pop('color')
+        greyscale = mcf.greyRGBize_image(**arg)
+        color_images.append(mcf.colorize_image(greyscale,color, colorintype='hex',gammacorr_color=2.2))
+    
+    return mcf.combine_multicolor(color_images, gamma=2.2)
+
+
+def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
+    position = position.directional_offset_by(0*u.deg,0.3*u.arcsec)
+
+    f275w_cutout  = Cutout2D(images.f275w.data,position,size=size,wcs=images.f275w.wcs)
+    f336w_cutout = reproject_interp(images.f336w,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
+    f438w_cutout = reproject_interp(images.f438w,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
+    f555w_cutout = reproject_interp(images.f555w,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
+    f814w_cutout = reproject_interp(images.f814w,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
+    halpha_cutout  = reproject_interp(images.Halpha,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
+    halpha_cutout_muse  = reproject_interp(images.Halpha,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
+
+    p1,p2 = np.nanpercentile(halpha_cutout_muse.data,[0,100])
+    f275_white  = {'color':'#d5c5e3','datin':f275w_cutout.data,'rescalefn':'linear','scaletype':'perc','min_max':[15,99.9]}
+    f336_purple = {'color':'#9C4FFF','datin':f336w_cutout.data,'rescalefn':'linear','scaletype':'perc','min_max':[15,99.9]}
+    f438_blue   = {'color':'#61b3cf','datin':f438w_cutout.data,'rescalefn':'linear','scaletype':'perc','min_max':[15,99.8]}
+    f555_green  = {'color':'#00e32d','datin':f555w_cutout.data,'rescalefn':'linear','scaletype':'perc','min_max':[15,99.8]}
+    f814_yellow = {'color':'#e08e1b','datin':f814w_cutout.data,'rescalefn':'linear','scaletype':'perc','min_max':[15,99.8]}
+    ha_red_peak = {'color':'#ed7f5a','datin':halpha_cutout_muse.data,'rescalefn':'linear','scaletype':'perc','min_max':[70,99.8]}
+    ha_red_dif  = {'color':'#ed5a95','datin':halpha_cutout_muse.data,'rescalefn':'log','scaletype':'abs','min_max':[4*p1,8*p2]}
+
+
+    rgb = create_multicolorimage(f275_white,f336_purple,f438_blue,f555_green,f814_yellow,ha_red_peak,ha_red_dif)
+
+    ax.imshow(rgb,origin='lower')
+
+    # plot the nebulae catalogue
+    cutout_mask, _  = reproject_interp(mask1,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,order='nearest-neighbor')    
+    region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+
+    contours = []
+    for i in region_ID:
+        blank_mask = np.zeros_like(cutout_mask)
+        blank_mask[cutout_mask==i] = 1
+        contours += find_contours(blank_mask, 0.5)
+
+    for coords in contours:
+        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textsc{ii} region')
+
+
+    mask = np.zeros((*cutout_mask.shape,4))
+    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
+    ax.imshow(mask,origin='lower')
+
+    # plot the association catalogue
+    if mask2:
+        cutout_mask, _  = reproject_interp(mask2,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,order='nearest-neighbor')    
+        region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+
+        contours = []
+        for i in region_ID:
+            blank_mask = np.zeros_like(cutout_mask)
+            blank_mask[cutout_mask==i] = 1
+            contours += find_contours(blank_mask, 0.5)
+
+        for coords in contours:
+            ax.plot(coords[:,1],coords[:,0],color='tab:blue',lw=1,label='association')
+
+        mask = np.zeros((*cutout_mask.shape,4))
+        mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.1)
+        ax.imshow(mask,origin='lower')
+
+    # mark the position of the clusters within the cutout
+    if points:
+        region = RectangleSkyRegion(position,0.9*size,0.9*size)
+        in_frame = points[region.contains(points['SkyCoord'],f275w_cutout.wcs)]
+        for row in in_frame:
+            x,y = row['SkyCoord'].to_pixel(f275w_cutout.wcs)
+            if 5<x<f275w_cutout.data.shape[0]-5 and 5<y<f275w_cutout.data.shape[1]-5:
+                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='compact cluster')
+
+    if label:
+        t = ax.text(0.07,0.868,label, transform=ax.transAxes,color='black',fontsize=7)
+        t.set_bbox(dict(facecolor='white', alpha=1, ec='white'))
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    return ax
 
 def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
                  width = two_column,filename=None,size=6*u.arcsec,ncols=4):
@@ -178,12 +272,25 @@ def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
                             label = label,
                             size  = 4*u.arcsecond)
 
-    for i in range(nrows*ncols-len(positions)):
+    h,l = fig.axes[0].get_legend_handles_labels()
+    ax = next(axes_iter)
+    ax.axis('off')
+    ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='upper center',frameon=False)
+
+    if True:
+        length = 0.263
+        ax.set(xlim=[0,1],ylim=[0,1])
+        x,y = 0.2,0.2
+        ax.plot([x,x+length],[y,y],color='black',marker='|',lw=1,ms=4)
+        ax.text(x+0.5*length,y*1.3,'100 pc',horizontalalignment='center',color='black',fontsize=7)
+
+
+    for i in range(nrows*ncols-len(positions)-1):
 
         # remove the empty axes at the bottom
         ax = next(axes_iter)
         ax.remove()
-    
+
     plt.subplots_adjust(wspace=-0.1, hspace=0)
 
     if filename:
@@ -242,11 +349,73 @@ def multi_cutout_rgb(positions,r,g,b,mask1=None,mask2=None,points=None,labels=No
 
 
 
+def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=None,
+                     width=two_column,filename=None,size=6*u.arcsec,ncols=4):
+    '''Plot multiple cutouts with the positoin of the clusters
+    
+    Parameters
+    ----------
+
+    image : NDData
+        the background image that is used
+    positions : SkyCoord
+        the position of the cutouts
+    masks : NDData
+        A mask with outlines
+    points : SkyCoord
+        Points to mark in the image
+
+    '''
+    
+    ncols = ncols
+    nrows = int(np.ceil(len(positions)/ncols))
+
+    fig, axes = plt.subplots(nrows=nrows,ncols=ncols,figsize=(width,width/ncols*nrows))
+    axes_iter = iter(axes.flatten())
+
+    for position,label in zip(positions,labels):  
+
+        ax = next(axes_iter)
+        ax = single_cutout_hst(ax,
+                            position = position,
+                            images=images,
+                            mask1 = mask1,
+                            mask2 = mask2,
+                            label = label,
+                            size  = 4*u.arcsecond)
+
+    h,l = fig.axes[0].get_legend_handles_labels()
+    ax = next(axes_iter)
+    ax.axis('off')
+    ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='upper center',frameon=False)
+
+    if True:
+        length = 0.263
+        ax.set(xlim=[0,1],ylim=[0,1])
+        x,y = 0.2,0.2
+        ax.plot([x,x+length],[y,y],color='black',marker='|',lw=1,ms=4)
+        ax.text(x+0.5*length,y*1.3,'100 pc',horizontalalignment='center',color='black',fontsize=7)
+
+
+    for i in range(nrows*ncols-len(positions)-1):
+
+        # remove the empty axes at the bottom
+        ax = next(axes_iter)
+        ax.remove()
+
+    plt.subplots_adjust(wspace=-0.1, hspace=0)
+
+    if filename:
+        plt.savefig(filename,dpi=300)
+    plt.show()
+
+
+
 from matplotlib.backends.backend_pdf import PdfPages
 import datetime
 
 def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
-                 filename=None,size=6*u.arcsec,nrows=5,ncols=4):
+                 filename=None,size=6*u.arcsec,nrows=5,ncols=4,**kwargs):
     '''Plot multiple cutouts with the positoin of the clusters
     
     Parameters
@@ -288,7 +457,9 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
                                  mask1 = mask1,
                                  mask2 = mask2,
                                  label = label,
-                                 size  = 4*u.arcsecond)
+                                 points = points,
+                                 size  = 4*u.arcsecond,
+                                 **kwargs)
 
             plt.subplots_adjust(wspace=-0.1, hspace=0)
             
@@ -297,7 +468,9 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
                 h,l = fig.axes[0].get_legend_handles_labels()
                 ax = next(axes_iter)
                 ax.axis('off')
-                ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='center',frameon=False)
+                #ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='center',frameon=False)
+                ax.legend(h,l,fontsize=7,loc='center',frameon=False)
+
                 t = ax.text(0.06,0.87,'region ID/assoc ID', transform=ax.transAxes,color='black',fontsize=8)
 
                 for i in range(nrows*ncols-len(sub_positions)-1):
@@ -308,6 +481,73 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
             pdf.savefig()  # saves the current figure into a pdf page
             plt.close()
 
+
+def multi_page_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=None,
+                          filename=None,size=6*u.arcsec,nrows=5,ncols=4,**kwargs):
+    '''Plot multiple cutouts with the positoin of the clusters
+    
+    Parameters
+    ----------
+
+    image : NDData
+        the background image that is used
+    positions : SkyCoord
+        the position of the cutouts
+    masks : NDData
+        A mask with outlines
+    points : SkyCoord
+        Points to mark in the image
+
+    '''
+    
+    width = 8.27
+    N = len(positions)
+    Npage = nrows*ncols
+    Npages = int(np.ceil(N/Npage))
+    with PdfPages(filename.with_suffix('.pdf')) as pdf:
+        
+        for i in range(Npages):
+            print(f'working on page {i+1} of {Npages}')
+
+    
+            sub_positions = positions[i*Npage:(i+1)*Npage]
+            sub_labels = labels[i*Npage:(i+1)*Npage]
+        
+            fig, axes = plt.subplots(nrows=nrows,ncols=ncols,figsize=(width,width/ncols*nrows))
+            axes_iter = iter(axes.flatten())
+
+            for position,label in zip(sub_positions,sub_labels):  
+
+                ax = next(axes_iter)
+                ax = single_cutout_hst(ax,
+                                 position = position,
+                                 images = images,
+                                 mask1 = mask1,
+                                 mask2 = mask2,
+                                 label = label,
+                                 points = points,
+                                 size  = 4*u.arcsecond,
+                                 **kwargs)
+
+            plt.subplots_adjust(wspace=-0.1, hspace=0)
+            
+            # only the last page has subplots that need to be removed
+            if i == int(np.ceil(N/Npage))-1:
+                h,l = fig.axes[0].get_legend_handles_labels()
+                ax = next(axes_iter)
+                ax.axis('off')
+                #ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='center',frameon=False)
+                ax.legend(h,l,fontsize=7,loc='center',frameon=False)
+
+                t = ax.text(0.06,0.87,'region ID/assoc ID', transform=ax.transAxes,color='black',fontsize=8)
+
+                for i in range(nrows*ncols-len(sub_positions)-1):
+                    # remove the empty axes at the bottom
+                    ax = next(axes_iter)
+                    ax.axis('off')    
+        
+            pdf.savefig()  # saves the current figure into a pdf page
+            plt.close()
 
 
 
