@@ -16,7 +16,7 @@ from astropy.visualization import simple_norm
 import matplotlib.pyplot as plt 
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('pymuse')
 HSTbands_wave = {'NUV':2704*u.AA,'U':3355*u.AA,'B':4325*u.AA,'V':5308*u.AA,'I':8024*u.AA}
 freq_to_wave = lambda band: u.mJy.to(u.erg/u.s/u.cm**2/u.Angstrom,equivalencies=spectral_density(HSTbands_wave[band]))
 
