@@ -113,28 +113,6 @@ tbl['HB4861_FLUX'] = np.nan
 tbl['HA6562_FLUX_ERR'] = np.nan
 tbl['HB4861_FLUX_ERR'] = np.nan
 
-
-'''
-if name == 'NGC3627':
-    print('using cutout for NGC3627')
-    associations_mask = Cutout2D(associations_mask.data,(3000,4800),size=(9000,5500),wcs=associations_mask.wcs)
-    x,y = list(zip(*[associations_mask.to_cutout_position((row['X'],row['Y'])) for row in tbl]))
-    tbl['X'] = x
-    tbl['Y'] = y
-
-# this gives very similar results
-print(f'reprojecting data')
-Halpha_repro = reproject_exact(Halpha,output_projection=associations_mask.wcs,
-                               shape_out=associations_mask.data.shape,return_footprint=False)
-Hbeta_repro = reproject_exact(Hbeta,output_projection=associations_mask.wcs,
-                               shape_out=associations_mask.data.shape,return_footprint=False)
-
-#print('measure Halpha and Hbeta from mask')
-# divide by 25 because of pixel size?
-Halpha_flux = np.array([np.sum(Halpha_repro[associations_mask.data==assoc_ID]) for assoc_ID in tbl['assoc_ID']]) / 25
-Hbeta_flux = np.array([np.sum(Hbeta_repro[associations_mask.data==assoc_ID]) for assoc_ID in tbl['assoc_ID']]) / 25
-'''
-
 # create new columns to save the measured fluxes with errors
 tbl['HA6562_FLUX'] = np.nan
 tbl['HB4861_FLUX'] = np.nan

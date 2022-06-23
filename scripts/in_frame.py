@@ -41,8 +41,8 @@ import astropy.units as u
 from astrotools.regions import find_sky_region
 from cluster.io import ReadHST
 
-scalepc = 32
-HSTband = 'nuv'
+scalepc = 16  
+HSTband = 'v'
 version = 'v1p2'
 
 logging.basicConfig(stream=sys.stdout,datefmt='%H:%M:%S',level=logging.INFO)
