@@ -31,6 +31,7 @@ astrosat_dir = data_ext / 'Astrosat'
 nebulae_dir  = data_ext / 'Products' / 'Nebulae_catalogs' / 'Nebulae_catalogue_v2'
 muse_dir     = data_ext / 'MUSE' / 'DR2.1' / 'copt' / 'MUSEDAP'
 
+
 # Milky Way E(B-V) from  Schlafly & Finkbeiner (2011)
 EBV_MW = {'IC5332': 0.015,'NGC0628': 0.062,'NGC1087': 0.03,'NGC1300': 0.026,
           'NGC1365': 0.018,'NGC1385': 0.018,'NGC1433': 0.008,'NGC1512': 0.009,
@@ -95,6 +96,10 @@ nebulae['HA_conv_FLUX_CORR_ERR'] = np.nan
 astrosat_sample =set([x.stem.split('_')[0] for x in astrosat_dir.iterdir() if x.is_file() and x.suffix=='.fits'])
 print(f'measuring FUV for {len(astrosat_sample)} galaxies')
 
+
+astrosat_bkg = ascii.read(basedir/'data'/'external'/'astrosat_bkg.txt',delimiter='&')
+astrosat_bkg.add_index('gal_name')
+
 for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
     
     if gal_name not in astrosat_sample:
@@ -119,6 +124,12 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
         nebulae_mask.data[nebulae_mask.data==-1] = np.nan
     
     print(f'read in astrosat data')
+    if gal_name in astrosat_bkg['gal_name']:
+        bkg = astrosat_bkg.loc[gal_name]['bkg'] * 1e-18        
+    else:
+        print(f'no background for {gal_name}')
+        bkg = 0
+        
     astro_file = astrosat_dir / f'{gal_name}_FUV_F148W_flux_reproj.fits'
     if not astro_file.is_file():
         astro_file = astrosat_dir / f'{gal_name}_FUV_F154W_flux_reproj.fits'
@@ -127,7 +138,7 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
 
     with fits.open(astro_file) as hdul:
         d = hdul[0].data
-        astrosat = NDData(hdul[0].data,meta=hdul[0].header,wcs=WCS(hdul[0].header))
+        astrosat = NDData(hdul[0].data-bkg,meta=hdul[0].header,wcs=WCS(hdul[0].header))
         for row in hdul[0].header['COMMENT']:
             if row.startswith('CTSTOFLUX'):
                 _,CTSTOFLUX = row.split(':')
@@ -135,8 +146,7 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
             if row.startswith('IntTime'):
                 _,IntTime = row.split(':')
                 IntTime = float(IntTime)
-        
-        
+    
     print('reproject regions')
 
     fuv_muse = reproject_exact(astrosat,nebulae_mask.meta,return_footprint=False)
