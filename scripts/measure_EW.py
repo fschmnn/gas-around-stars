@@ -31,7 +31,7 @@ continuum_Hbeta_interval = [(4827.9,4847.9),(4876.6,4891.6)]
 # read the nebulae catalogue
 with fits.open(Path('/data')/'Products'/'Nebulae_catalogs'/'Nebulae_catalogue_v2'/'Nebulae_catalogue_v2.fits') as hdul:
     catalogue = Table(hdul[1].data)
-tmp = catalogue['gal_name','region_ID','HA6562_VEL','HA6562_FLUX','HA6562_FLUX_ERR'].copy()
+tmp = catalogue['gal_name','region_ID','HA6562_VEL'].copy()
 
 # define the new columns
 tmp['Halpha'] = np.nan
@@ -42,6 +42,10 @@ tmp['continuum_Halpha'] = np.nan
 tmp['continuum_Halpha_error'] = np.nan
 tmp['continuum_Halpha_bkg'] = np.nan
 tmp['continuum_Halpha_bkg_error'] = np.nan
+tmp['EW_HA'] = np.nan 
+tmp['EW_HA_ERR'] = np.nan 
+tmp['EW_HA_CORR'] = np.nan 
+tmp['EW_HA_CORR_ERR'] = np.nan 
 
 tmp['Hbeta'] = np.nan
 tmp['Hbeta_error'] = np.nan
@@ -51,7 +55,10 @@ tmp['continuum_Hbeta'] = np.nan
 tmp['continuum_Hbeta_error'] = np.nan
 tmp['continuum_Hbeta_bkg'] = np.nan
 tmp['continuum_Hbeta_bkg_error'] = np.nan
-
+tmp['EW_HB'] = np.nan  
+tmp['EW_HB_ERR'] = np.nan  
+tmp['EW_HB_CORR'] = np.nan  
+tmp['EW_HB_CORR_ERR'] = np.nan  
     
 # the systematic velocities of the galaxies from Groves et al. (in preparation)
 v_sys = {'IC5332': 699.0,'NGC0628': 651.0,'NGC1087': 1502.0,'NGC1300': 1545.0,'NGC1365': 1613.0,
@@ -110,6 +117,7 @@ def extract_spectrum_with_background(data,mask,label,factor=1,max_iter=10,plot=F
     
     # sum up the spectra in the previously defined masks
     hii_region = np.nansum(data[...,mask.data==label],axis=1)
+
     # we use the median along the spatial axis
     continuum  = np.nanmedian(data[...,input_mask & np.isnan(mask.data)],axis=1)
     area_continuum = np.nansum(input_mask & np.isnan(mask.data))
@@ -217,8 +225,11 @@ for row in tqdm(tmp):
     z = ((v_sys[gal_name]+row['HA6562_VEL'])*u.km/u.s/c.c).decompose().value
 
     spec,bkg = extract_spectrum_with_background(data_cube,nebulae_mask,row['region_ID'],factor=factor)
+    # we can use the same function to propagate the uncertainty. 
+    # However the error_cube contains the variance. We need to take the sqrt.
     error_spec, error_bkg_spec = extract_spectrum_with_background(error_cube,nebulae_mask,row['region_ID'],factor=factor)
-
+    error_spec, error_bkg_spec = np.sqrt(error_spec), np.sqrt(error_bkg_spec)
+    
     # we need to correct for MW extinction
     spec *= RedCorr.getCorr(wlam)
     bkg  *= RedCorr.getCorr(wlam)
@@ -255,6 +266,20 @@ for row in tqdm(tmp):
     row['Hbeta_bkg'] = Hbeta_bkg    
     row['Hbeta_bkg_error'] = Hbeta_bkg_error
     
+# calculate equivalent width with uncertainty
+tmp['EW_HA'] = tmp['Halpha']/tmp['continuum_Halpha']
+tmp['EW_HA_ERR'] = tmp['EW_HA'] * np.sqrt((tmp['Halpha_error']/tmp['Halpha'])**2 + (tmp['continuum_Halpha_error']/tmp['continuum_Halpha'])**2)
+tmp['EW_HA_CORR'] = tmp['Halpha']/(tmp['continuum_Halpha']-tmp['continuum_Halpha_bkg'])
+tmp['EW_HA_CORR_ERR'] = np.sqrt( (tmp['Halpha_error']**2 * (tmp['continuum_Halpha']-tmp['continuum_Halpha_bkg'])**2 + tmp['Halpha']**2 * (tmp['continuum_Halpha_error']+tmp['continuum_Halpha_bkg_error'])**2) / (tmp['continuum_Halpha']-tmp['continuum_Halpha_bkg'])**4 )
+
+tmp['EW_HB'] = tmp['Hbeta']/tmp['continuum_Hbeta']
+tmp['EW_HB_ERR'] = tmp['EW_HB'] * np.sqrt((tmp['Hbeta_error']/tmp['Hbeta'])**2 + (tmp['continuum_Hbeta_error']/tmp['continuum_Hbeta'])**2)
+tmp['EW_HB_CORR'] = tmp['Hbeta']/(tmp['continuum_Hbeta']-tmp['continuum_Hbeta_bkg'])
+tmp['EW_HB_CORR_ERR'] = np.sqrt( (tmp['Hbeta_error']**2 * (tmp['continuum_Hbeta']-tmp['continuum_Hbeta_bkg'])**2 + tmp['Hbeta']**2 * (tmp['continuum_Hbeta_error']+tmp['continuum_Hbeta_bkg_error'])**2) / (tmp['continuum_Hbeta']-tmp['continuum_Hbeta_bkg'])**4 )
+
+# this column is no longer needed
+del tmp['HA6562_VEL']
+
 doc = f'''measure equivalent widths for the nebulae catalogue  
 EW(Ha) and EW(Hb) are measured with the following steps:
 1) The integrated spectra of each HII region is extracted from the 
@@ -273,7 +298,7 @@ EW(Ha) and EW(Hb) are measured with the following steps:
    estimated from the variance cube
 Based on `Nebulae_catalogue_v2.fits`. 
 This catalogue was created with the following script:
-https://github.com/fschmnn/cluster/blob/master/scripts/measure_eq_width.py
+https://github.com/fschmnn/cluster/blob/master/scripts/measure_EW.py
 last update: {date.today().strftime("%b %d, %Y")}
 '''
 
