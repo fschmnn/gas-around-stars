@@ -172,9 +172,14 @@ for gal_name in tqdm(sorted(np.unique(nebulae['gal_name']))):
         nebulae_mask = NDData(hdul[0].data.astype(float),mask=Halpha.mask,meta=hdul[0].header,wcs=WCS(hdul[0].header))
         nebulae_mask.data[nebulae_mask.data==-1] = np.nan
     
+    # the background is already extinction corrected, but the FUV maps are not
+    EBV_correction = 1
+    rc_MW = pn.RedCorr(R_V=3.1,E_BV=EBV_correction*EBV_MW[gal_name],law='CCM89 oD94')
+    extinction_mw  = rc_MW.getCorr(1481)
+
     print(f'read in astrosat data')
     if gal_name in astrosat_bkg['gal_name']:
-        bkg = astrosat_bkg.loc[gal_name]['bkg'] * 1e-18        
+        bkg = astrosat_bkg.loc[gal_name]['bkg'] * 1e-18 / extinction_mw  
     else:
         print(f'no background for {gal_name}')
         bkg = 0
