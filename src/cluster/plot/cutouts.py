@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 from astropy.nddata import Cutout2D
 from astropy.visualization import simple_norm
@@ -229,8 +230,8 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
                 ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='compact cluster')
 
     if label:
-        t = ax.text(0.07,0.868,label, transform=ax.transAxes,color='black',fontsize=7)
-        t.set_bbox(dict(facecolor='white', alpha=1, ec='white'))
+        t = ax.text(0.068,0.868,label, transform=ax.transAxes,color='black',fontsize=7)
+        t.set_bbox(dict(facecolor='white', alpha=0.8, ec='white',lw=0))
 
     ax.set_xticks([])
     ax.set_yticks([])
@@ -383,6 +384,10 @@ def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=N
                             mask2 = mask2,
                             label = label,
                             size  = 4*u.arcsecond)
+        for child in ax.get_children():
+            if isinstance(child, mpl.spines.Spine):
+                child.set_color('#ffffff')
+                child.set_linewidth(2)
 
     h,l = fig.axes[0].get_legend_handles_labels()
     ax = next(axes_iter)
