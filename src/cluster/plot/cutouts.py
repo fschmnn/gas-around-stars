@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.lines as mlines
+
 
 from astropy.nddata import Cutout2D
 from astropy.visualization import simple_norm
@@ -13,6 +15,7 @@ from skimage.measure import find_contours
 
 from pnlf.plot import add_scale, create_RGB
 
+from astrotools.constants import tab10
 single_column = 3.321 # in inch
 two_column    = 6.974 # in inch
 
@@ -34,7 +37,7 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
         contours += find_contours(blank_mask, 0.5)
 
     for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textsc{ii} region')
+        ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=1,label=r'H\textsc{ii} region')
 
 
     mask = np.zeros((*cutout_mask.shape,4))
@@ -53,7 +56,7 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
             contours += find_contours(blank_mask, 0.5)
 
         for coords in contours:
-            ax.plot(coords[:,1],coords[:,0],color='tab:blue',lw=1,label='association')
+            ax.plot(coords[:,1],coords[:,0],color=tab10[1],lw=1,label='association')
 
         mask = np.zeros((*cutout_mask.shape,4))
         mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.1)
@@ -67,7 +70,7 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
         for row in in_frame:
             x,y = row['SkyCoord'].to_pixel(cutout_image.wcs)
             if 5<x<cutout_image.data.shape[0]-5 and 5<y<cutout_image.data.shape[1]-5:
-                ax.scatter(x,y,marker='o',facecolors='none',s=40,lw=0.8,color='green',label='DOLPHOT peaks')
+                ax.scatter(x,y,marker='o',facecolors='none',s=40,lw=0.8,color=tab10[4],label='compact cluster')
                 if 'label' in points.columns:
                     ax.annotate(row['label'], (x+4, y),color='green')
  
@@ -79,6 +82,81 @@ def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None
     ax.set_yticks([])
     
     return ax
+
+def single_cutout_complex(ax,position,image,
+                          nebulae_mask=None,associations_mask=None,points=None,
+                          region_IDs=None,label=None,size=6*u.arcsec):
+    '''plot a single cutout at position
+    
+    '''
+
+    # shift the position slightly to make room for the label
+    position = position.directional_offset_by(0*u.deg,0.3*u.arcsec)
+
+    cutout_image = Cutout2D(image.data,position,size=size,wcs=image.wcs)
+    norm = simple_norm(cutout_image.data,clip=False,stretch='linear',percent=99.5)
+    ax.imshow(cutout_image.data,origin='lower',norm=norm,cmap=plt.cm.gray_r)
+
+    # plot the nebulae catalogue
+    cutout_mask, _  = reproject_interp(nebulae_mask,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
+    region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+
+    contours = []
+    for i in region_ID:
+        blank_mask = np.zeros_like(cutout_mask)
+        blank_mask[cutout_mask==i] = 1
+        contours += find_contours(blank_mask, 0.5)
+
+    for coords in contours:
+        ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=1,label=r'H\textsc{ii} region')
+
+    # plot the complex    
+    contours = find_contours(np.isin(cutout_mask,region_IDs), 0.5)
+    for coords in contours:
+        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1.2)
+
+    mask = np.zeros((*cutout_mask.shape,4))
+    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
+    ax.imshow(mask,origin='lower',cmap=plt.cm.gist_heat)
+
+    # plot the association catalogue
+    cutout_mask, _  = reproject_interp(associations_mask,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
+    region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+
+    contours = []
+    for i in region_ID:
+        blank_mask = np.zeros_like(cutout_mask)
+        blank_mask[cutout_mask==i] = 1
+        contours += find_contours(blank_mask, 0.5)
+
+    for coords in contours:
+        ax.plot(coords[:,1],coords[:,0],color=tab10[1],lw=1,label='association')
+
+    mask = np.zeros((*cutout_mask.shape,4))
+    mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.1)
+    ax.imshow(mask,origin='lower')
+
+    # mark the position of the clusters within the cutout
+    if points:
+        
+        region = RectangleSkyRegion(position,0.9*size,0.9*size)
+        in_frame = points[region.contains(points['SkyCoord'],cutout_image.wcs)]
+        for row in in_frame:
+            x,y = row['SkyCoord'].to_pixel(cutout_image.wcs)
+            if 5<x<cutout_image.data.shape[0]-5 and 5<y<cutout_image.data.shape[1]-5:
+                ax.scatter(x,y,marker='o',facecolors='none',s=40,lw=0.8,color=tab10[4],label='compact cluster')
+                if 'label' in points.columns:
+                    ax.annotate(row['label'], (x+4, y),color='green')
+ 
+    if label:
+        t = ax.text(0.0663,0.8666,label, transform=ax.transAxes,color='black',fontsize=7)
+        t.set_bbox(dict(facecolor='white', alpha=1, ec='white'))
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    return ax
+
 
 def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
     
@@ -195,7 +273,7 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
         contours += find_contours(blank_mask, 0.5)
 
     for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textsc{ii} region')
+        ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=0.8,label=r'H\textsc{ii} region')
 
 
     mask = np.zeros((*cutout_mask.shape,4))
@@ -214,7 +292,7 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
             contours += find_contours(blank_mask, 0.5)
 
         for coords in contours:
-            ax.plot(coords[:,1],coords[:,0],color='tab:blue',lw=1,label='association')
+            ax.plot(coords[:,1],coords[:,0],color=tab10[1],lw=0.8,label='association')
 
         mask = np.zeros((*cutout_mask.shape,4))
         mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.1)
@@ -227,7 +305,7 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
         for row in in_frame:
             x,y = row['SkyCoord'].to_pixel(f275w_cutout.wcs)
             if 5<x<f275w_cutout.data.shape[0]-5 and 5<y<f275w_cutout.data.shape[1]-5:
-                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.4,color='tab:blue',label='compact cluster')
+                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.8,zorder=4,color=tab10[4],label='compact cluster')
 
     if label:
         t = ax.text(0.068,0.868,label, transform=ax.transAxes,color='black',fontsize=7)
@@ -383,30 +461,39 @@ def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=N
                             mask1 = mask1,
                             mask2 = mask2,
                             label = label,
-                            size  = 4*u.arcsecond)
+                            points = points,
+                            size  = size)
         for child in ax.get_children():
             if isinstance(child, mpl.spines.Spine):
                 child.set_color('#ffffff')
                 child.set_linewidth(2)
 
-    h,l = fig.axes[0].get_legend_handles_labels()
+    #h,l = fig.axes[0].get_legend_handles_labels()
     ax = next(axes_iter)
     ax.axis('off')
-    ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='upper center',frameon=False)
+    #ax.legend(h[::len(h)-1],l[::(len(l)-1)],fontsize=7,loc='upper center',frameon=False)
 
-    if True:
-        length = 0.263
-        ax.set(xlim=[0,1],ylim=[0,1])
-        x,y = 0.2,0.2
-        ax.plot([x,x+length],[y,y],color='black',marker='|',lw=1,ms=4)
-        ax.text(x+0.5*length,y*1.3,'100 pc',horizontalalignment='center',color='black',fontsize=7)
-
+    h1 = mlines.Line2D([], [], color=tab10[0],label=r'H\,\textsc{ii} region')
+    h2 = mlines.Line2D([], [], color=tab10[1],label='association')
+    h3 = mlines.Line2D([], [], lw=0,mfc='white',mec=tab10[4],marker='o',label='cluster')
+    ax.legend(handles=[h1,h2,h3],fontsize=6,loc='lower left',frameon=False,bbox_to_anchor=(0.1 ,0.45)) 
 
     for i in range(nrows*ncols-len(positions)-1):
 
         # remove the empty axes at the bottom
         ax = next(axes_iter)
         ax.remove()
+
+    # add the scalebar
+    if True:
+        # 100 pc = 0.263 for the 4" used in NGC1365
+        # 100 pc = 0.2109 for the 8" used in NGC2835
+        length = 0.2109
+        ax.set(xlim=[0,1],ylim=[0,1])
+        x,y = 0.2,0.2
+        ax.plot([x,x+length],[y,y],color='black',marker='|',lw=1,ms=4)
+        ax.text(x+0.5*length,y*1.3,'100 pc',horizontalalignment='center',color='black',fontsize=7)
+
 
     plt.subplots_adjust(wspace=-0.1, hspace=0)
 

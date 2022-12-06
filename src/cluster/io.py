@@ -15,6 +15,10 @@ from astropy.visualization import simple_norm
 
 import matplotlib.pyplot as plt 
 
+import astropy.units as u
+import astropy.constants as c
+from astropy.io import ascii
+from astropy.table import QTable
 
 logger = logging.getLogger('pymuse')
 HSTbands_wave = {'NUV':2704*u.AA,'U':3355*u.AA,'B':4325*u.AA,'V':5308*u.AA,'I':8024*u.AA}
@@ -154,3 +158,44 @@ def read_associations(folder,target,scalepc,HSTband='nuv',version='v1p2',data='a
             return associations_mask
 
     return associations, associations_mask
+
+
+
+
+def read_bpass(BPASS_folder,binary='bin',imf='imf135',upper_mass='300',metallicity='z014'):
+    '''read the output from BPASS
+    
+    
+    Parameters
+    ----------
+    
+    binary : str (`bin` or `sin`)
+        use binarys or single stars
+        
+    imf : str
+        the slope of the IMF (the model)
+        
+    upper_mass : str
+        mass of the most massive stars
+    
+    metallicity : str
+    '''
+    
+    filename = BPASS_folder/f'bpass_v2.2.1_{imf}_{upper_mass}'/binary/f'ionizing-{binary}-{imf}_{upper_mass}.{metallicity}.dat'
+
+    if not filename.is_file():
+        print('file does not exist')
+        return filename
+    
+    units = [u.LogUnit(u.year),u.LogUnit(1/u.s),u.LogUnit(u.erg/u.s),u.LogUnit(u.erg/u.s/u.A),u.LogUnit(u.erg/u.s/u.A)]
+    names = ['log_age','log_Q','log_Halpha','log_FUV','log_NUV']
+    bpass = ascii.read(filename,names=names)
+    bpass = QTable(bpass)
+
+    for unit, col in zip(units,bpass.columns):
+        bpass[col].unit = unit 
+    for col in list(bpass.columns):
+        if col.startswith('log'):
+            bpass[col] = bpass[col].physical
+            bpass.rename_column(col,col[4:])
+    return bpass
