@@ -4,9 +4,7 @@
 
 this repository contains the code for the two papers
 
-* Stellar associations powering Hɪɪ regions – I. Defining an evolutionary sequence (submitted). 
-
-  ![cutouts](https://raw.githubusercontent.com/fschmnn/cluster/master/references/cutouts.png)
+* Stellar associations powering Hɪɪ regions – I. Defining an evolutionary sequence (accepted). 
 
 * Stellar associations powering Hɪɪ regions – II. Escape fractions (in preparation).
 
@@ -17,12 +15,12 @@ this repository contains the code for the two papers
 * **The package**: often re-used functions are moved to the `src` folder and constitute the main package.
 * **Scripts**: the main analyze steps are bundles together in scripts. Here are a few examples: 
   * *match_catalogues.py*: the main script that matches the spatial masks of the HII regions to the spatial masks of the stellar associations.
-  * *measure_EW.py*: measure the equivalent width of the HII regions from their spectra (for H$\alpha$ and H$\beta$).
+  * *measure_EW.py*: measure the equivalent width of the HII regions from their spectra (for Halpha and Hbeta).
   * *neighboring_associations.py*: find all associations that are in a given radius around each HII region.
 * **Notebooks**: jupyter notebooks are then used to post-process the results and create figures.
   * *Project2 Clusters+HII-Regions Single.ipynb*: analyze a single galaxy and produce some intermediate catalogues. 
   * *Project2 Clusters+HII-Regions Multi.ipynb*: read in the previously constructed catalogues and analyze all galaxies at once.
-  * *Project3 Escape fractions.ipynb*: 
+  * *Project3 Escape fractions.ipynb*: compute the ionizing photon flux based on the age and mass of the stellar population and use it to calculate escape fractions.
 
 
 
