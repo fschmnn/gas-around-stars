@@ -298,7 +298,7 @@ def main(name,version,HSTband,scalepc):
     assoc_tmp['Nnebulae'] = [len(associations_dict[k]) for k in assoc_tmp['assoc_ID']]
 
     assoc_tmp['region_ID'] = np.nan
-    assoc_tmp['region_ID'][assoc_tmp['1to1']] = [associations_dict[k][0] for k in assoc_tmp[assoc_tmp['1to1']]['assoc_ID']]
+    assoc_tmp['region_ID'][assoc_tmp['Nnebulae']==1] = [associations_dict[k][0] for k in assoc_tmp[assoc_tmp['Nnebulae']==1]['assoc_ID']]
 
     overlap = join(
         Table(np.unique(associations_mask.data[~np.isnan(associations_mask.data)],return_counts=True),names=['assoc_ID','size']),

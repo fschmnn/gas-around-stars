@@ -19,34 +19,58 @@ from astrotools.constants import tab10
 single_column = 3.321 # in inch
 two_column    = 6.974 # in inch
 
-def single_cutout(ax,position,image,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
+def single_cutout(ax,position,image,nebulae_mask=None,associations_mask=None,points=None,label=None,size=6*u.arcsec):
+    '''plot a cutout of image at position and overplot masks
+    
+    Parameters
+    ----------
+
+    ax : matplotlib axes
+
+    position : SkyCoord
+    
+    image : ndarray
+
+    nebulae_mask : ndarray
+
+    association_mask : ndarray
+
+    points : astropy Table with column SkyCoord
+
+    label : list of str
+
+    size : astropy unit (angel)
+    '''
+
+
     position = position.directional_offset_by(0*u.deg,0.3*u.arcsec)
 
     cutout_image = Cutout2D(image.data,position,size=size,wcs=image.wcs)
     norm = simple_norm(cutout_image.data,clip=False,stretch='linear',percent=99.5)
     ax.imshow(cutout_image.data,origin='lower',norm=norm,cmap=plt.cm.gray_r)
 
-    # plot the nebulae catalogue
-    cutout_mask, _  = reproject_interp(mask1,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
-    region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+    if nebulae_mask:
+        # plot the nebulae catalogue
+        cutout_mask, _  = reproject_interp(nebulae_mask,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
+        region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
 
-    contours = []
-    for i in region_ID:
-        blank_mask = np.zeros_like(cutout_mask)
-        blank_mask[cutout_mask==i] = 1
-        contours += find_contours(blank_mask, 0.5)
+        contours = []
+        for i in region_ID:
+            blank_mask = np.zeros_like(cutout_mask)
+            blank_mask[cutout_mask==i] = 1
+            contours += find_contours(blank_mask, 0.5)
 
-    for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=1,label=r'H\textsc{ii} region')
+        for coords in contours:
+            ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=1,label=r'H\textsc{ii} region')
 
 
-    mask = np.zeros((*cutout_mask.shape,4))
-    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
-    ax.imshow(mask,origin='lower',cmap=plt.cm.gist_heat)
+        mask = np.zeros((*cutout_mask.shape,4))
+        mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
+        ax.imshow(mask,origin='lower',cmap=plt.cm.gist_heat)
 
     # plot the association catalogue
-    if mask2:
-        cutout_mask, _  = reproject_interp(mask2,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
+    if associations_mask:
+        cutout_mask, _  = reproject_interp(associations_mask,output_projection=cutout_image.wcs,shape_out=cutout_image.shape,order='nearest-neighbor')    
         region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
 
         contours = []
@@ -158,7 +182,7 @@ def single_cutout_complex(ax,position,image,
     return ax
 
 
-def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
+def single_cutout_rgb(ax,position,r,g,b,nebulae_mask=None,associations_mask=None,points=None,label=None,size=6*u.arcsec):
     
     cutout_b = Cutout2D(b.data,position,size=size,wcs=b.wcs)
     cutout_r, _  = reproject_interp(r,output_projection=cutout_b.wcs,shape_out=cutout_b.shape)    
@@ -170,26 +194,27 @@ def single_cutout_rgb(ax,position,r,g,b,mask1=None,mask2=None,points=None,label=
     ax.imshow(rgb,origin='lower')
 
     # plot the nebulae catalogue
-    cutout_mask, _  = reproject_interp(mask1,output_projection=cutout_b.wcs,shape_out=cutout_b.shape,order='nearest-neighbor')    
-    region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+    if nebulae_mask:
+        cutout_mask, _  = reproject_interp(nebulae_mask,output_projection=cutout_b.wcs,shape_out=cutout_b.shape,order='nearest-neighbor')    
+        region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
 
-    contours = []
-    for i in region_ID:
-        blank_mask = np.zeros_like(cutout_mask)
-        blank_mask[cutout_mask==i] = 1
-        contours += find_contours(blank_mask, 0.5)
+        contours = []
+        for i in region_ID:
+            blank_mask = np.zeros_like(cutout_mask)
+            blank_mask[cutout_mask==i] = 1
+            contours += find_contours(blank_mask, 0.5)
 
-    for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textit{ii}-region')
+        for coords in contours:
+            ax.plot(coords[:,1],coords[:,0],color='tab:red',lw=1,label=r'H\textit{ii}-region')
 
 
-    mask = np.zeros((*cutout_mask.shape,4))
-    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
-    ax.imshow(mask,origin='lower')
+        mask = np.zeros((*cutout_mask.shape,4))
+        mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
+        ax.imshow(mask,origin='lower')
 
     # plot the association catalogue
-    if mask2:
-        cutout_mask, _  = reproject_interp(mask2,output_projection=cutout_b.wcs,shape_out=cutout_b.shape,order='nearest-neighbor')    
+    if associations_mask:
+        cutout_mask, _  = reproject_interp(associations_mask,output_projection=cutout_b.wcs,shape_out=cutout_b.shape,order='nearest-neighbor')    
         region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
 
         contours = []
@@ -237,8 +262,8 @@ def create_multicolorimage(*args):
     return mcf.combine_multicolor(color_images, gamma=2.2)
 
 
-def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label=None,size=6*u.arcsec):
-    position = position.directional_offset_by(0*u.deg,0.3*u.arcsec)
+def single_cutout_hst(ax,position,images,nebulae_mask=None,associations_mask=None,points=None,complexes=None,label=None,size=6*u.arcsec):
+    position = position.directional_offset_by(0*u.deg,0.1*u.arcsec)
 
     f275w_cutout  = Cutout2D(images.f275w.data,position,size=size,wcs=images.f275w.wcs)
     f336w_cutout = reproject_interp(images.f336w,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,return_footprint=False)    
@@ -263,27 +288,15 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
     ax.imshow(rgb,origin='lower')
 
     # plot the nebulae catalogue
-    cutout_mask, _  = reproject_interp(mask1,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,order='nearest-neighbor')    
-    region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
-
-    contours = []
-    for i in region_ID:
-        blank_mask = np.zeros_like(cutout_mask)
-        blank_mask[cutout_mask==i] = 1
-        contours += find_contours(blank_mask, 0.5)
-
-    for coords in contours:
-        ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=0.8,label=r'H\textsc{ii} region')
-
-
-    mask = np.zeros((*cutout_mask.shape,4))
-    mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
-    ax.imshow(mask,origin='lower')
-
-    # plot the association catalogue
-    if mask2:
-        cutout_mask, _  = reproject_interp(mask2,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,order='nearest-neighbor')    
+    if nebulae_mask:
+        cutout_mask, _  = reproject_interp(nebulae_mask,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,order='nearest-neighbor')    
         region_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+
+        if complexes:
+            # plot the complex    
+            contours = find_contours(np.isin(cutout_mask,complexes), 0.5)
+            for coords in contours:
+                ax.plot(coords[:,1],coords[:,0],color='tab:orange',lw=1.2)
 
         contours = []
         for i in region_ID:
@@ -292,7 +305,28 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
             contours += find_contours(blank_mask, 0.5)
 
         for coords in contours:
-            ax.plot(coords[:,1],coords[:,0],color=tab10[1],lw=0.8,label='association')
+            ax.plot(coords[:,1],coords[:,0],color=tab10[0],lw=0.6,label=r'H\textsc{ii} region')
+
+
+        mask = np.zeros((*cutout_mask.shape,4))
+        mask[~np.isnan(cutout_mask.data),:] = (0.84, 0.15, 0.16,0.1)
+        ax.imshow(mask,origin='lower')
+
+
+
+    # plot the association catalogue
+    if associations_mask:
+        cutout_mask, _  = reproject_interp(associations_mask,output_projection=f275w_cutout.wcs,shape_out=f275w_cutout.shape,order='nearest-neighbor')    
+        assoc_ID = np.unique(cutout_mask[~np.isnan(cutout_mask)])
+
+        contours = []
+        for i in assoc_ID:
+            blank_mask = np.zeros_like(cutout_mask)
+            blank_mask[cutout_mask==i] = 1
+            contours += find_contours(blank_mask, 0.5)
+
+        for coords in contours:
+            ax.plot(coords[:,1],coords[:,0],color=tab10[1],lw=0.6,label='association')
 
         mask = np.zeros((*cutout_mask.shape,4))
         mask[~np.isnan(cutout_mask.data),:] = (0.12,0.47,0.71,0.1)
@@ -305,7 +339,7 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
         for row in in_frame:
             x,y = row['SkyCoord'].to_pixel(f275w_cutout.wcs)
             if 5<x<f275w_cutout.data.shape[0]-5 and 5<y<f275w_cutout.data.shape[1]-5:
-                ax.scatter(x,y,marker='o',facecolors='none',s=20,lw=0.8,zorder=4,color=tab10[4],label='compact cluster')
+                ax.scatter(x,y,marker='o',facecolors='none',s=12,lw=0.5,zorder=4,color=tab10[4],label='compact cluster')
 
     if label:
         t = ax.text(0.068,0.868,label, transform=ax.transAxes,color='black',fontsize=7)
@@ -316,7 +350,7 @@ def single_cutout_hst(ax,position,images,mask1=None,mask2=None,points=None,label
     
     return ax
 
-def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
+def multi_cutout(positions,image,nebulae_mask=None,associations_mask=None,points=None,labels=None,
                  width = two_column,filename=None,size=6*u.arcsec,ncols=4):
     '''Plot multiple cutouts with the position of the clusters
     
@@ -346,8 +380,8 @@ def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
         ax = single_cutout(ax,
                             position = position,
                             image = image,
-                            mask1 = mask1,
-                            mask2 = mask2,
+                            nebulae_mask = nebulae_mask,
+                            associations_mask = associations_mask,
                             label = label,
                             size  = 4*u.arcsecond)
 
@@ -377,7 +411,7 @@ def multi_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
         plt.savefig(filename,dpi=400)
     plt.show()
 
-def multi_cutout_rgb(positions,r,g,b,mask1=None,mask2=None,points=None,labels=None,
+def multi_cutout_rgb(positions,r,g,b,nebulae_mask=None,associations_mask=None,points=None,labels=None,
                  filename=None,size=6*u.arcsec,ncols=4):
     '''Plot multiple cutouts with the positoin of the clusters
     
@@ -408,8 +442,8 @@ def multi_cutout_rgb(positions,r,g,b,mask1=None,mask2=None,points=None,labels=No
         ax = single_cutout_rgb(ax,
                             position = position,
                             r=r,g=g,b=b,
-                            mask1 = mask1,
-                            mask2 = mask2,
+                            nebulae_mask = nebulae_mask,
+                            associations_mask = associations_mask,
                             label = label,
                             size  = 4*u.arcsecond)
 
@@ -428,8 +462,8 @@ def multi_cutout_rgb(positions,r,g,b,mask1=None,mask2=None,points=None,labels=No
 
 
 
-def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=None,
-                     width=two_column,filename=None,size=6*u.arcsec,ncols=4):
+def multi_cutout_hst(positions,images,nebulae_mask=None,associations_mask=None,points=None,complexes=None,
+                     labels=None,scalebar=None,width=two_column,filename=None,size=6*u.arcsec,ncols=4):
     '''Plot multiple cutouts with the positoin of the clusters
     
     Parameters
@@ -452,16 +486,17 @@ def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=N
     fig, axes = plt.subplots(nrows=nrows,ncols=ncols,figsize=(width,width/ncols*nrows))
     axes_iter = iter(axes.flatten())
 
-    for position,label in zip(positions,labels):  
+    for position,label,region_IDs in zip(positions,labels,complexes):  
 
         ax = next(axes_iter)
         ax = single_cutout_hst(ax,
                             position = position,
                             images=images,
-                            mask1 = mask1,
-                            mask2 = mask2,
-                            label = label,
+                            nebulae_mask = nebulae_mask,
+                            associations_mask = associations_mask,
                             points = points,
+                            complexes=region_IDs,
+                            label = label,
                             size  = size)
         for child in ax.get_children():
             if isinstance(child, mpl.spines.Spine):
@@ -478,22 +513,21 @@ def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=N
     h3 = mlines.Line2D([], [], lw=0,mfc='white',mec=tab10[4],marker='o',label='cluster')
     ax.legend(handles=[h1,h2,h3],fontsize=6,loc='lower left',frameon=False,bbox_to_anchor=(0.1 ,0.45)) 
 
+    # add the scalebar
+    if scalebar:
+        # 100 pc = 0.263 for the 4" used in NGC1365
+        # 100 pc = 0.2109 for the 8" used in NGC2835
+        length = scalebar[1]
+        ax.set(xlim=[0,1],ylim=[0,1])
+        x,y = 0.2,0.2
+        ax.plot([x,x+length],[y,y],color='black',marker='|',lw=1,ms=4)
+        ax.text(x+0.5*length,y*1.4,scalebar[0],horizontalalignment='center',color='black',fontsize=7)
+
     for i in range(nrows*ncols-len(positions)-1):
 
         # remove the empty axes at the bottom
         ax = next(axes_iter)
         ax.remove()
-
-    # add the scalebar
-    if True:
-        # 100 pc = 0.263 for the 4" used in NGC1365
-        # 100 pc = 0.2109 for the 8" used in NGC2835
-        length = 0.2109
-        ax.set(xlim=[0,1],ylim=[0,1])
-        x,y = 0.2,0.2
-        ax.plot([x,x+length],[y,y],color='black',marker='|',lw=1,ms=4)
-        ax.text(x+0.5*length,y*1.3,'100 pc',horizontalalignment='center',color='black',fontsize=7)
-
 
     plt.subplots_adjust(wspace=-0.1, hspace=0)
 
@@ -506,7 +540,7 @@ def multi_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=N
 from matplotlib.backends.backend_pdf import PdfPages
 import datetime
 
-def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=None,
+def multi_page_cutout(positions,image,nebulae_mask=None,associations_mask=None,points=None,labels=None,
                  filename=None,size=6*u.arcsec,nrows=5,ncols=4,**kwargs):
     '''Plot multiple cutouts with the positoin of the clusters
     
@@ -546,8 +580,8 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
                 ax = single_cutout(ax,
                                  position = position,
                                  image = image,
-                                 mask1 = mask1,
-                                 mask2 = mask2,
+                                 nebulae_mask = nebulae_mask,
+                                 associations_mask = associations_mask,
                                  label = label,
                                  points = points,
                                  size  = 4*u.arcsecond,
@@ -574,7 +608,7 @@ def multi_page_cutout(positions,image,mask1=None,mask2=None,points=None,labels=N
             plt.close()
 
 
-def multi_page_cutout_hst(positions,images,mask1=None,mask2=None,points=None,labels=None,
+def multi_page_cutout_hst(positions,images,nebulae_mask=None,associations_mask=None,points=None,labels=None,
                           filename=None,size=6*u.arcsec,nrows=5,ncols=4,**kwargs):
     '''Plot multiple cutouts with the positoin of the clusters
     
@@ -614,8 +648,8 @@ def multi_page_cutout_hst(positions,images,mask1=None,mask2=None,points=None,lab
                 ax = single_cutout_hst(ax,
                                  position = position,
                                  images = images,
-                                 mask1 = mask1,
-                                 mask2 = mask2,
+                                 nebulae_mask = nebulae_mask,
+                                 associations_mask = associations_mask,
                                  label = label,
                                  points = points,
                                  size  = 4*u.arcsecond,
